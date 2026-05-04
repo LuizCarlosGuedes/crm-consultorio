@@ -118,7 +118,7 @@ export default function Home() {
     await fetchLeads();
   }
 
-  const headerTopH = activeTab === 'crm' ? 89 : 53;
+  const headerTopH = activeTab === 'crm' ? 101 : 53;
 
   return (
     <div className="min-h-screen bg-background">
@@ -135,7 +135,7 @@ export default function Home() {
         onRefresh={fetchLeads}
       />
 
-      <Sidebar view={view} onViewChange={handleViewChange} />
+      <Sidebar view={view} onViewChange={handleViewChange} topOffset={headerTopH} />
 
       <main
         className="pl-12 overflow-hidden"
@@ -150,7 +150,7 @@ export default function Home() {
           <>
             {/* Kanban */}
             {view === 'kanban' && (
-              <div className="h-[calc(100vh-89px)] overflow-hidden p-3">
+              <div className="overflow-hidden p-3" style={{ height: `calc(100vh - ${headerTopH}px)` }}>
                 <KanbanBoard
                   leads={filteredLeads}
                   onMoveCard={handleMoveCard}

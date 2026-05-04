@@ -42,7 +42,7 @@ export function Header({
             <div className="w-7 h-7 bg-primary rounded-md flex items-center justify-center">
               <span className="text-white text-xs font-bold">CRM</span>
             </div>
-            <span className="font-semibold text-sm hidden sm:block">Consultório Médico</span>
+            <span className="font-semibold text-sm hidden sm:block">Clínica Dr. Luiz Guedes</span>
           </div>
 
           {/* Main tabs */}

@@ -9,6 +9,7 @@ type ViewType = 'kanban' | 'lista' | 'dashboard' | 'configuracoes';
 interface SidebarProps {
   view: ViewType;
   onViewChange: (view: ViewType) => void;
+  topOffset: number;
 }
 
 const MENU_ITEMS = [
@@ -18,10 +19,13 @@ const MENU_ITEMS = [
   { id: 'configuracoes', icon: Settings,   label: 'Configurações' },
 ] as const;
 
-export function Sidebar({ view, onViewChange }: SidebarProps) {
+export function Sidebar({ view, onViewChange, topOffset }: SidebarProps) {
   return (
     <TooltipProvider delayDuration={200}>
-      <aside className="fixed left-0 top-[89px] bottom-0 z-30 w-12 bg-background border-r border-border flex flex-col items-center py-3 gap-1">
+      <aside
+        className="fixed left-0 bottom-0 z-30 w-12 bg-background border-r border-border flex flex-col items-center py-3 gap-1"
+        style={{ top: `${topOffset}px` }}
+      >
         {MENU_ITEMS.map(item => {
           const Icon = item.icon;
           const isActive = view === item.id;

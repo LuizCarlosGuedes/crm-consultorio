@@ -6,7 +6,7 @@ import { ThemeProvider } from '@/providers/ThemeProvider';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'CRM Consultório Médico',
+  title: 'CRM Clínica Dr. Luiz Guedes',
   description: 'CRM Kanban para gestão de pacientes e leads do consultório',
 };
 

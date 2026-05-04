@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\douto\\\\Desktop\\\\meu-crm-consultorio\" -Recurse -File | Where-Object { $_.FullName -notmatch 'node_modules|\\\\.next' } | Select-Object FullName | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\Users\\\\douto\\\\Desktop\\\\meu-crm-consultorio\\\\\", \"\"\\) } | Sort-Object)",
-      "PowerShell(npm run *)"
+      "PowerShell(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   }
 }
