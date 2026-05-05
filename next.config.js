@@ -5,6 +5,12 @@ const nextConfig = {
   images: {
     remotePatterns: [],
   },
+  experimental: {
+    isrMemoryCacheSize: 0,
+  },
+  generateBuildId: async () => {
+    return Date.now().toString();
+  },
 };
 
 module.exports = nextConfig;
