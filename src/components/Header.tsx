@@ -6,8 +6,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 
 interface HeaderProps {
-  activeTab: 'crm' | 'dashboard';
-  onTabChange: (tab: 'crm' | 'dashboard') => void;
+  activeTab: 'crm' | 'dashboard' | 'pendencias';
+  onTabChange: (tab: 'crm' | 'dashboard' | 'pendencias') => void;
   searchTerm: string;
   onSearchChange: (val: string) => void;
   filterPrioridade: string;
@@ -16,6 +16,7 @@ interface HeaderProps {
   onShowAllToggle: () => void;
   onAddLead: () => void;
   onRefresh: () => void;
+  pendenciasCount?: number;
 }
 
 const FILTERS = [
@@ -32,6 +33,7 @@ export function Header({
   filterPrioridade, onFilterChange,
   showAll, onShowAllToggle,
   onAddLead, onRefresh,
+  pendenciasCount = 0,
 }: HeaderProps) {
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur border-b border-border">
@@ -66,6 +68,25 @@ export function Header({
               }`}
             >
               Dashboard
+            </button>
+            <button
+              onClick={() => onTabChange('pendencias')}
+              className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'pendencias'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              }`}
+            >
+              Pendências
+              {pendenciasCount > 0 && (
+                <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-bold px-1 leading-none ${
+                  activeTab === 'pendencias'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-red-500 text-white'
+                }`}>
+                  {pendenciasCount > 99 ? '99+' : pendenciasCount}
+                </span>
+              )}
             </button>
           </nav>
         </div>

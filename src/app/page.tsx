@@ -16,7 +16,7 @@ import { Loader2 } from 'lucide-react';
 type ViewType = 'kanban' | 'lista' | 'dashboard' | 'configuracoes' | 'pendencias';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'crm' | 'dashboard'>('crm');
+  const [activeTab, setActiveTab] = useState<'crm' | 'dashboard' | 'pendencias'>('crm');
   const [view, setView] = useState<ViewType>('kanban');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,15 +74,17 @@ export default function Home() {
   }, [fetchLeads, fetchPendencias]);
 
   // Sync tab & view
-  function handleTabChange(tab: 'crm' | 'dashboard') {
+  function handleTabChange(tab: 'crm' | 'dashboard' | 'pendencias') {
     setActiveTab(tab);
     if (tab === 'dashboard') setView('dashboard');
-    else if (view === 'dashboard') setView('kanban');
+    else if (tab === 'pendencias') setView('pendencias');
+    else if (view === 'dashboard' || view === 'pendencias') setView('kanban');
   }
 
   function handleViewChange(v: ViewType) {
     setView(v);
     if (v === 'dashboard') setActiveTab('dashboard');
+    else if (v === 'pendencias') setActiveTab('pendencias');
     else setActiveTab('crm');
   }
 
@@ -163,6 +165,7 @@ export default function Home() {
         onShowAllToggle={() => setShowAll(p => !p)}
         onAddLead={() => setShowAddModal(true)}
         onRefresh={fetchLeads}
+        pendenciasCount={pendencias.length}
       />
 
       <Sidebar
