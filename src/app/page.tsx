@@ -2,17 +2,18 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Lead } from '@/lib/types';
+import { Lead, Pendencia } from '@/lib/types';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { ListView } from '@/components/ListView';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { LeadModal } from '@/components/LeadModal';
 import { AddLeadModal } from '@/components/AddLeadModal';
+import { PendenciasView } from '@/components/PendenciasView';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import { Loader2 } from 'lucide-react';
 
-type ViewType = 'kanban' | 'lista' | 'dashboard' | 'configuracoes';
+type ViewType = 'kanban' | 'lista' | 'dashboard' | 'configuracoes' | 'pendencias';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'crm' | 'dashboard'>('crm');
@@ -25,6 +26,9 @@ export default function Home() {
   const [filterPrioridade, setFilterPrioridade] = useState('todos');
   const [showAll, setShowAll] = useState(false);
 
+  const [pendencias, setPendencias] = useState<Pendencia[]>([]);
+  const [pendenciasLoading, setPendenciasLoading] = useState(false);
+
   const fetchLeads = useCallback(async () => {
     const { data, error } = await supabase
       .from('leads')
@@ -34,18 +38,40 @@ export default function Home() {
     setLoading(false);
   }, []);
 
+  const fetchPendencias = useCallback(async () => {
+    setPendenciasLoading(true);
+    const { data, error } = await supabase
+      .from('pendencias')
+      .select('*')
+      .eq('status', 'pendente')
+      .order('created_at', { ascending: false });
+    if (!error && data) setPendencias(data as Pendencia[]);
+    setPendenciasLoading(false);
+  }, []);
+
   useEffect(() => {
     fetchLeads();
+    fetchPendencias();
 
-    const channel = supabase
+    const leadsChannel = supabase
       .channel('leads-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
         fetchLeads();
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchLeads]);
+    const pendenciasChannel = supabase
+      .channel('pendencias-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pendencias' }, () => {
+        fetchPendencias();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(leadsChannel);
+      supabase.removeChannel(pendenciasChannel);
+    };
+  }, [fetchLeads, fetchPendencias]);
 
   // Sync tab & view
   function handleTabChange(tab: 'crm' | 'dashboard') {
@@ -58,6 +84,10 @@ export default function Home() {
     setView(v);
     if (v === 'dashboard') setActiveTab('dashboard');
     else setActiveTab('crm');
+  }
+
+  function handleResolvePendencia(id: string) {
+    setPendencias(prev => prev.filter(p => p.id !== id));
   }
 
   const filteredLeads = showAll
@@ -135,13 +165,18 @@ export default function Home() {
         onRefresh={fetchLeads}
       />
 
-      <Sidebar view={view} onViewChange={handleViewChange} topOffset={headerTopH} />
+      <Sidebar
+        view={view}
+        onViewChange={handleViewChange}
+        topOffset={headerTopH}
+        pendenciasCount={pendencias.length}
+      />
 
       <main
         className="pl-12 overflow-hidden"
         style={{ paddingTop: `${headerTopH}px` }}
       >
-        {loading ? (
+        {loading && view !== 'pendencias' ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             <span className="ml-2 text-sm text-muted-foreground">Carregando leads...</span>
@@ -178,6 +213,16 @@ export default function Home() {
               </div>
             )}
 
+            {/* Pendências */}
+            {view === 'pendencias' && (
+              <PendenciasView
+                pendencias={pendencias}
+                loading={pendenciasLoading}
+                onResolve={handleResolvePendencia}
+                onRefresh={fetchPendencias}
+              />
+            )}
+
             {/* Configurações */}
             {view === 'configuracoes' && (
               <div className="p-4 max-w-2xl">
@@ -190,6 +235,7 @@ export default function Home() {
                       <p>POST /api/webhook/n8n/mover-card</p>
                       <p>POST /api/webhook/n8n/atualizar-card</p>
                       <p>POST /api/webhook/n8n/adicionar-nota</p>
+                      <p>POST /api/webhook/n8n/resolver-pendencia</p>
                       <p>GET  /api/webhook/n8n/pipeline</p>
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
@@ -200,7 +246,7 @@ export default function Home() {
                     <h3 className="text-sm font-medium mb-2">Status do Sistema</h3>
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span className="text-xs text-muted-foreground">Supabase conectado · {leads.length} leads na base</span>
+                      <span className="text-xs text-muted-foreground">Supabase conectado · {leads.length} leads na base · {pendencias.length} pendências abertas</span>
                     </div>
                   </div>
                 </div>

@@ -5,7 +5,15 @@
       "PowerShell(npm run *)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\douto\\\\Desktop\\\\meu-crm-consultorio\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(New-Item -ItemType Directory -Path \"C:\\\\Users\\\\douto\\\\Desktop\\\\meu-crm-consultorio\\\\src\\\\app\\\\api\\\\pendencias\" -Force)",
+      "Bash(Out-Null)",
+      "Bash(New-Item -ItemType Directory -Path \"C:\\\\Users\\\\douto\\\\Desktop\\\\meu-crm-consultorio\\\\src\\\\app\\\\api\\\\webhook\\\\n8n\\\\resolver-pendencia\" -Force)",
+      "Bash(Write-Host \"Directories created\")"
     ]
   }
 }

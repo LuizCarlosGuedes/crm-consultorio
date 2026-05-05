@@ -48,3 +48,15 @@ export interface Stage {
   slaMinutos: number;
   slaLabel: string;
 }
+
+export interface Pendencia {
+  id: string;
+  paciente_nome: string;
+  paciente_telefone: string;
+  tipo: string;
+  descricao: string;
+  chatwoot_conversation_id: number | null;
+  status: 'pendente' | 'resolvido';
+  created_at: string;
+  resolved_at: string | null;
+}
