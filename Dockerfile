@@ -15,6 +15,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
+
+ARG CACHEBUST=1
+RUN echo "Cache bust: $CACHEBUST"
 COPY . .
 
 # Build args are injected at build time via docker-compose or Easypanel
