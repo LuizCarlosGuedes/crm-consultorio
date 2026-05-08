@@ -16,21 +16,19 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const etapa = searchParams.get('etapa');
+  const pipelineId = searchParams.get('pipeline_id');
 
   let query = supabase
     .from('leads')
-    .select('id, nome, telefone, origem, procedimento, prioridade, etapa_atual, valor_consulta, nota, chatwoot_url, movido_por_ia, data_entrada, sla_vencimento')
+    .select('id, nome, telefone, origem, procedimento, prioridade, etapa_atual, pipeline_id, valor_consulta, nota, chatwoot_url, movido_por_ia, data_entrada, sla_vencimento, tags, total_investido')
     .order('data_entrada', { ascending: false });
 
-  if (etapa) {
-    query = query.eq('etapa_atual', etapa);
-  }
+  if (pipelineId) query = query.eq('pipeline_id', Number(pipelineId));
+  if (etapa)      query = query.eq('etapa_atual', etapa);
 
   const { data, error } = await query;
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Group by stage for N8N convenience
   const grouped: Record<string, typeof data> = {};
   for (const lead of data ?? []) {
     if (!grouped[lead.etapa_atual]) grouped[lead.etapa_atual] = [];
@@ -38,8 +36,9 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    total: data?.length ?? 0,
-    por_etapa: grouped,
-    leads: data,
+    pipeline_id:  pipelineId ? Number(pipelineId) : 'todos',
+    total:        data?.length ?? 0,
+    por_etapa:    grouped,
+    leads:        data,
   });
 }

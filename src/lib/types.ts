@@ -11,6 +11,7 @@ export interface Lead {
   procedimento: string;
   prioridade: Prioridade;
   etapa_atual: string;
+  pipeline_id: number;
   valor_consulta: number;
   nota: string;
   chatwoot_url: string;
@@ -18,6 +19,28 @@ export interface Lead {
   data_entrada: string;
   data_atualizacao: string;
   sla_vencimento: string | null;
+  // Dados pessoais
+  data_nascimento?: string | null;
+  sexo?: string | null;
+  estado_civil?: string | null;
+  cpf?: string | null;
+  rg?: string | null;
+  // Endereço
+  endereco?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
+  bairro?: string | null;
+  cep?: string | null;
+  estado?: string | null;
+  cidade?: string | null;
+  // Perfil clínico
+  profissao?: string | null;
+  foi_indicacao?: boolean;
+  como_conheceu?: string | null;
+  tags?: string[];
+  total_investido?: number;
+  numero_consultas?: number;
+  followup_tentativas?: number;
 }
 
 export interface HistoricoMovimentacao {
@@ -47,6 +70,7 @@ export interface Stage {
   corHex: string;
   slaMinutos: number;
   slaLabel: string;
+  pipeline: 1 | 2;
 }
 
 export interface Pendencia {
@@ -59,4 +83,23 @@ export interface Pendencia {
   status: 'pendente' | 'resolvido';
   created_at: string;
   resolved_at: string | null;
+}
+
+export interface Financeiro {
+  id: string;
+  lead_id: string;
+  tipo: string;
+  descricao: string;
+  valor: number;
+  data_registro: string;
+}
+
+export interface ConteudoNutricao {
+  id: string;
+  titulo: string;
+  conteudo: string;
+  tags: string[];
+  semana: number;
+  ativo: boolean;
+  created_at: string;
 }

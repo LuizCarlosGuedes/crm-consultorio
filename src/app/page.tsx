@@ -3,30 +3,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Lead, Pendencia } from '@/lib/types';
+import { PIPELINE_1, PIPELINE_2 } from '@/lib/constants';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { ListView } from '@/components/ListView';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { LeadModal } from '@/components/LeadModal';
 import { AddLeadModal } from '@/components/AddLeadModal';
 import { PendenciasView } from '@/components/PendenciasView';
-import { Header } from '@/components/Header';
-import { Sidebar } from '@/components/Sidebar';
+import { Header, ActiveTab, ViewMode } from '@/components/Header';
 import { Loader2 } from 'lucide-react';
 
-type ViewType = 'kanban' | 'lista' | 'dashboard' | 'configuracoes' | 'pendencias';
-
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'crm' | 'dashboard' | 'pendencias'>('crm');
-  const [view, setView] = useState<ViewType>('kanban');
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab]       = useState<ActiveTab>('pipeline1');
+  const [viewMode,  setViewMode]        = useState<ViewMode>('kanban');
+  const [leads,     setLeads]           = useState<Lead[]>([]);
+  const [loading,   setLoading]         = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm,   setSearchTerm]   = useState('');
   const [filterPrioridade, setFilterPrioridade] = useState('todos');
-  const [showAll, setShowAll] = useState(false);
-
-  const [pendencias, setPendencias] = useState<Pendencia[]>([]);
+  const [showAll,  setShowAll]          = useState(false);
+  const [pendencias, setPendencias]     = useState<Pendencia[]>([]);
   const [pendenciasLoading, setPendenciasLoading] = useState(false);
 
   const fetchLeads = useCallback(async () => {
@@ -55,16 +52,12 @@ export default function Home() {
 
     const leadsChannel = supabase
       .channel('leads-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
-        fetchLeads();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, fetchLeads)
       .subscribe();
 
     const pendenciasChannel = supabase
       .channel('pendencias-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pendencias' }, () => {
-        fetchPendencias();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pendencias' }, fetchPendencias)
       .subscribe();
 
     return () => {
@@ -73,39 +66,27 @@ export default function Home() {
     };
   }, [fetchLeads, fetchPendencias]);
 
-  // Sync tab & view
-  function handleTabChange(tab: 'crm' | 'dashboard' | 'pendencias') {
-    setActiveTab(tab);
-    if (tab === 'dashboard') setView('dashboard');
-    else if (tab === 'pendencias') setView('pendencias');
-    else if (view === 'dashboard' || view === 'pendencias') setView('kanban');
-  }
+  // Filtragem compartilhada entre os dois pipelines
+  function filtrarLeads(allLeads: Lead[], pipelineId: 1 | 2): Lead[] {
+    const doPipeline = allLeads.filter(l => {
+      const pid = l.pipeline_id ?? 1;
+      return pid === pipelineId;
+    });
 
-  function handleViewChange(v: ViewType) {
-    setView(v);
-    if (v === 'dashboard') setActiveTab('dashboard');
-    else if (v === 'pendencias') setActiveTab('pendencias');
-    else setActiveTab('crm');
-  }
+    if (showAll) return doPipeline;
 
-  function handleResolvePendencia(id: string) {
-    setPendencias(prev => prev.filter(p => p.id !== id));
+    return doPipeline.filter(lead => {
+      const matchesSearch =
+        searchTerm === '' ||
+        lead.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        lead.telefone.includes(searchTerm);
+      const matchesPrioridade =
+        filterPrioridade === 'todos' || lead.prioridade === filterPrioridade;
+      return matchesSearch && matchesPrioridade;
+    });
   }
-
-  const filteredLeads = showAll
-    ? leads
-    : leads.filter(lead => {
-        const matchesSearch =
-          searchTerm === '' ||
-          lead.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          lead.telefone.includes(searchTerm);
-        const matchesPrioridade =
-          filterPrioridade === 'todos' || lead.prioridade === filterPrioridade;
-        return matchesSearch && matchesPrioridade;
-      });
 
   async function handleMoveCard(leadId: string, newStage: string) {
-    // Optimistic update
     setLeads(prev =>
       prev.map(l => l.id === leadId ? { ...l, etapa_atual: newStage, movido_por_ia: false } : l)
     );
@@ -116,9 +97,8 @@ export default function Home() {
       body: JSON.stringify({ etapa_atual: newStage, movido_por: 'humano' }),
     });
 
-    if (!res.ok) fetchLeads(); // Revert on error
+    if (!res.ok) fetchLeads();
 
-    // Update selected lead if it was moved
     if (selectedLead?.id === leadId) {
       setSelectedLead(prev => prev ? { ...prev, etapa_atual: newStage } : null);
     }
@@ -138,25 +118,36 @@ export default function Home() {
     }
   }
 
-  async function handleAddLead(data: {
-    nome: string; telefone: string; origem: string; procedimento: string;
-    prioridade: string; nota: string; valor_consulta: number; chatwoot_url: string;
-  }) {
+  async function handleAddLead(data: Record<string, unknown>) {
     await fetch('/api/leads', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, pipeline_id: activeTab === 'pipeline2' ? 2 : 1 }),
     });
     await fetchLeads();
   }
 
-  const headerTopH = activeTab === 'crm' ? 101 : 53;
+  function handleResolvePendencia(id: string) {
+    setPendencias(prev => prev.filter(p => p.id !== id));
+  }
+
+  const activePipeline  = activeTab === 'pipeline2' ? 2 : 1;
+  const activeStages    = activeTab === 'pipeline2' ? PIPELINE_2 : PIPELINE_1;
+  const leadsP1         = filtrarLeads(leads, 1);
+  const leadsP2         = filtrarLeads(leads, 2);
+  const filteredLeads   = activePipeline === 2 ? leadsP2 : leadsP1;
+
+  // Header height: with filter bar (pipeline tabs) = 101px, without = 53px
+  const showFilterBar   = activeTab === 'pipeline1' || activeTab === 'pipeline2';
+  const headerH         = showFilterBar ? 101 : 53;
 
   return (
     <div className="min-h-screen bg-background">
       <Header
         activeTab={activeTab}
-        onTabChange={handleTabChange}
+        onTabChange={setActiveTab}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         filterPrioridade={filterPrioridade}
@@ -168,92 +159,72 @@ export default function Home() {
         pendenciasCount={pendencias.length}
       />
 
-      <Sidebar
-        view={view}
-        onViewChange={handleViewChange}
-        topOffset={headerTopH}
-        pendenciasCount={pendencias.length}
-      />
-
       <main
-        className="pl-12 overflow-hidden"
-        style={{ paddingTop: `${headerTopH}px` }}
+        className="pl-0 overflow-hidden"
+        style={{ paddingTop: `${headerH}px` }}
       >
-        {loading && view !== 'pendencias' ? (
+        {loading && (activeTab === 'pipeline1' || activeTab === 'pipeline2') ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             <span className="ml-2 text-sm text-muted-foreground">Carregando leads...</span>
           </div>
         ) : (
           <>
-            {/* Kanban */}
-            {view === 'kanban' && (
-              <div className="overflow-hidden p-3" style={{ height: `calc(100vh - ${headerTopH}px)` }}>
-                <KanbanBoard
-                  leads={filteredLeads}
-                  onMoveCard={handleMoveCard}
-                  onCardClick={setSelectedLead}
-                />
-              </div>
-            )}
-
-            {/* Lista */}
-            {view === 'lista' && (
-              <div className="p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    {filteredLeads.length} leads {!showAll && searchTerm && `para "${searchTerm}"`}
-                  </p>
-                </div>
-                <ListView leads={filteredLeads} onCardClick={setSelectedLead} />
-              </div>
-            )}
-
             {/* Dashboard */}
-            {view === 'dashboard' && (
+            {activeTab === 'dashboard' && (
               <div className="p-4">
                 <Dashboard leads={leads} />
               </div>
             )}
 
+            {/* Pipeline 1 — Captação */}
+            {activeTab === 'pipeline1' && viewMode === 'kanban' && (
+              <div className="overflow-hidden px-3 pt-3" style={{ height: `calc(100vh - ${headerH}px)` }}>
+                <KanbanBoard
+                  stages={PIPELINE_1}
+                  leads={leadsP1}
+                  onMoveCard={handleMoveCard}
+                  onCardClick={setSelectedLead}
+                />
+              </div>
+            )}
+            {activeTab === 'pipeline1' && viewMode === 'lista' && (
+              <div className="p-4">
+                <p className="text-sm text-muted-foreground mb-3">
+                  {filteredLeads.length} leads no Pipeline 1
+                </p>
+                <ListView leads={leadsP1} onCardClick={setSelectedLead} />
+              </div>
+            )}
+
+            {/* Pipeline 2 — Pacientes Ativos */}
+            {activeTab === 'pipeline2' && viewMode === 'kanban' && (
+              <div className="overflow-hidden px-3 pt-3" style={{ height: `calc(100vh - ${headerH}px)` }}>
+                <KanbanBoard
+                  stages={PIPELINE_2}
+                  leads={leadsP2}
+                  onMoveCard={handleMoveCard}
+                  onCardClick={setSelectedLead}
+                />
+              </div>
+            )}
+            {activeTab === 'pipeline2' && viewMode === 'lista' && (
+              <div className="p-4">
+                <p className="text-sm text-muted-foreground mb-3">
+                  {filteredLeads.length} leads no Pipeline 2
+                </p>
+                <ListView leads={leadsP2} onCardClick={setSelectedLead} />
+              </div>
+            )}
+
             {/* Pendências */}
-            {view === 'pendencias' && (
+            {activeTab === 'pendencias' && (
               <PendenciasView
                 pendencias={pendencias}
                 loading={pendenciasLoading}
                 onResolve={handleResolvePendencia}
                 onRefresh={fetchPendencias}
               />
-            )}
-
-            {/* Configurações */}
-            {view === 'configuracoes' && (
-              <div className="p-4 max-w-2xl">
-                <h2 className="text-lg font-semibold mb-4">Configurações</h2>
-                <div className="bg-card border border-border rounded-lg p-6 space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Webhooks N8N</h3>
-                    <div className="space-y-2 text-xs text-muted-foreground font-mono bg-muted/50 rounded p-3">
-                      <p>POST /api/webhook/n8n/novo-lead</p>
-                      <p>POST /api/webhook/n8n/mover-card</p>
-                      <p>POST /api/webhook/n8n/atualizar-card</p>
-                      <p>POST /api/webhook/n8n/adicionar-nota</p>
-                      <p>POST /api/webhook/n8n/resolver-pendencia</p>
-                      <p>GET  /api/webhook/n8n/pipeline</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Use o header: <span className="font-mono">Authorization: Bearer {'<'}WEBHOOK_SECRET_TOKEN{'>'}</span>
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Status do Sistema</h3>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span className="text-xs text-muted-foreground">Supabase conectado · {leads.length} leads na base · {pendencias.length} pendências abertas</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
             )}
           </>
         )}
@@ -270,6 +241,7 @@ export default function Home() {
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
         onAdd={handleAddLead}
+        defaultPipelineId={activePipeline}
       />
     </div>
   );

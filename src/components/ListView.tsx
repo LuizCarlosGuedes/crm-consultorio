@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { ArrowUpDown, ExternalLink, ChevronUp, ChevronDown } from 'lucide-react';
 import { Lead } from '@/lib/types';
-import { ETAPAS } from '@/lib/constants';
 import { calcSLAStatus, formatarData, formatarMoeda, getEtapa, getPrioridadeCor, getOrigemIcon, cn } from '@/lib/utils';
 
 interface ListViewProps {

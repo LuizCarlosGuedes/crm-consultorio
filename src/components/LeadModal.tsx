@@ -1,18 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, Clock, Phone, Stethoscope, User, DollarSign, Tag, Edit2, Save, X, MessageSquare, Plus, ArrowRight } from 'lucide-react';
-import { Lead, HistoricoMovimentacao, Nota } from '@/lib/types';
-import { ETAPAS, ORIGENS, PRIORIDADES } from '@/lib/constants';
-import { calcSLAStatus, formatarData, formatarMoeda, formatarTempoRelativo, getOrigemIcon, getEtapa, cn } from '@/lib/utils';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from './ui/dialog';
+  ExternalLink, ArrowRight, Edit2, Save, Plus, X,
+} from 'lucide-react';
+import { Lead, HistoricoMovimentacao, Nota, Financeiro } from '@/lib/types';
+import { PIPELINE_1, PIPELINE_2, ORIGENS, PRIORIDADES, TAGS } from '@/lib/constants';
+import {
+  calcSLAStatus, formatarData, formatarMoeda, formatarTempoRelativo,
+  getOrigemIcon, getEtapa, calcularIdade, formatarTag, cn,
+} from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Separator } from './ui/separator';
 import { ScrollArea } from './ui/scroll-area';
 
 interface LeadModalProps {
@@ -22,22 +24,27 @@ interface LeadModalProps {
   onMoveCard: (leadId: string, newStage: string) => Promise<void>;
 }
 
+type Section = 'detalhes' | 'perfil' | 'financeiro' | 'historico' | 'notas';
+
 export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState<Partial<Lead>>({});
-  const [historico, setHistorico] = useState<HistoricoMovimentacao[]>([]);
-  const [notas, setNotas] = useState<Nota[]>([]);
-  const [newNota, setNewNota] = useState('');
+  const [isEditing,    setIsEditing]    = useState(false);
+  const [editData,     setEditData]     = useState<Partial<Lead>>({});
+  const [historico,    setHistorico]    = useState<HistoricoMovimentacao[]>([]);
+  const [notas,        setNotas]        = useState<Nota[]>([]);
+  const [financeiro,   setFinanceiro]   = useState<Financeiro[]>([]);
+  const [newNota,      setNewNota]      = useState('');
   const [newNotaAutor, setNewNotaAutor] = useState('Atendente');
-  const [loading, setLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState<'detalhes' | 'historico' | 'notas'>('detalhes');
+  const [loading,      setLoading]      = useState(false);
+  const [activeSection, setActiveSection] = useState<Section>('detalhes');
 
   useEffect(() => {
     if (!lead) return;
     setEditData({});
     setIsEditing(false);
+    setActiveSection('detalhes');
     fetchHistorico(lead.id);
     fetchNotas(lead.id);
+    fetchFinanceiro(lead.id);
   }, [lead?.id]);
 
   async function fetchHistorico(leadId: string) {
@@ -48,6 +55,14 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
   async function fetchNotas(leadId: string) {
     const res = await fetch(`/api/leads/${leadId}/notas`);
     if (res.ok) setNotas(await res.json());
+  }
+
+  async function fetchFinanceiro(leadId: string) {
+    const res = await fetch(`/api/financeiro?lead_id=${leadId}`);
+    if (res.ok) {
+      const data = await res.json();
+      setFinanceiro(Array.isArray(data) ? data : []);
+    }
   }
 
   async function handleSave() {
@@ -73,36 +88,68 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
     setLoading(false);
   }
 
-  async function handleMoverPara(etapa: string) {
+  async function handleMoverPara(etapaId: string) {
     if (!lead) return;
     setLoading(true);
-    await onMoveCard(lead.id, etapa);
+    await onMoveCard(lead.id, etapaId);
     await fetchHistorico(lead.id);
     setLoading(false);
   }
 
+  function toggleTag(tag: string) {
+    const current = editData.tags ?? lead?.tags ?? [];
+    const next = current.includes(tag)
+      ? current.filter(t => t !== tag)
+      : [...current, tag];
+    setEditData(p => ({ ...p, tags: next }));
+  }
+
   if (!lead) return null;
 
-  const etapa = getEtapa(lead.etapa_atual);
+  const etapa     = getEtapa(lead.etapa_atual);
   const slaStatus = calcSLAStatus(lead);
-  const currentEditData = { ...lead, ...editData };
+  const idade     = calcularIdade(lead.data_nascimento);
+  const d         = { ...lead, ...editData };
+
+  // Etapas do mesmo pipeline para mover
+  const pipelineDoLead = (lead.pipeline_id ?? 1) === 2 ? PIPELINE_2 : PIPELINE_1;
+  const etapasParaMover = pipelineDoLead.filter(e => e.id !== lead.etapa_atual);
+
+  const totalFinanceiro = financeiro.reduce((acc, f) => acc + (f.valor ?? 0), 0);
+
+  const SECTIONS: { id: Section; label: string }[] = [
+    { id: 'detalhes',   label: 'Detalhes' },
+    { id: 'perfil',     label: 'Perfil' },
+    { id: 'financeiro', label: `Financeiro${totalFinanceiro > 0 ? ` (${formatarMoeda(totalFinanceiro)})` : ''}` },
+    { id: 'historico',  label: 'Histórico' },
+    { id: 'notas',      label: `Notas (${notas.length})` },
+  ];
 
   return (
     <Dialog open={!!lead} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <div className="flex items-start gap-3">
-            <div className={cn('w-3 h-3 rounded-full mt-1.5 flex-shrink-0', {
-              'bg-red-500 animate-sla-pulse': lead.prioridade === 'urgente',
-              'bg-orange-500': lead.prioridade === 'alta',
-              'bg-green-500':  lead.prioridade === 'normal',
-              'bg-gray-500':   lead.prioridade === 'frio',
-            })} />
+            <div
+              className="w-3 h-3 rounded-full mt-1.5 flex-shrink-0"
+              style={{ backgroundColor: etapa?.corHex ?? '#6B7280' }}
+            />
             <div className="flex-1 min-w-0">
               <DialogTitle className="text-base leading-tight">{lead.nome}</DialogTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {getOrigemIcon(lead.origem)} {lead.origem} · Entrou {formatarTempoRelativo(lead.data_entrada)}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                <span className="text-xs text-muted-foreground">
+                  {getOrigemIcon(lead.origem)} {lead.origem}
+                </span>
+                {idade !== null && (
+                  <span className="text-xs text-muted-foreground">· {idade} anos</span>
+                )}
+                {lead.sexo && (
+                  <span className="text-xs text-muted-foreground">· {lead.sexo}</span>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  · Pipeline {lead.pipeline_id ?? 1}
+                </span>
+              </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               {lead.movido_por_ia && (
@@ -120,43 +167,46 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
                   onClick={e => e.stopPropagation()}
                 >
                   <ExternalLink className="h-3 w-3" />
-                  Chatwoot →
+                  Chatwoot
                 </a>
               )}
             </div>
           </div>
 
           {/* Section tabs */}
-          <div className="flex gap-1 mt-3">
-            {(['detalhes', 'historico', 'notas'] as const).map(s => (
+          <div className="flex gap-0.5 mt-3 flex-wrap">
+            {SECTIONS.map(s => (
               <button
-                key={s}
-                onClick={() => setActiveSection(s)}
-                className={cn('px-3 py-1 rounded text-xs font-medium transition-colors capitalize', {
-                  'bg-primary text-primary-foreground': activeSection === s,
-                  'text-muted-foreground hover:text-foreground hover:bg-accent': activeSection !== s,
+                key={s.id}
+                onClick={() => setActiveSection(s.id)}
+                className={cn('px-3 py-1 rounded text-xs font-medium transition-colors', {
+                  'bg-primary text-primary-foreground': activeSection === s.id,
+                  'text-muted-foreground hover:text-foreground hover:bg-accent': activeSection !== s.id,
                 })}
               >
-                {s === 'historico' ? 'Histórico' : s === 'notas' ? `Notas (${notas.length})` : 'Detalhes'}
+                {s.label}
               </button>
             ))}
           </div>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[60vh]">
-          <div className="px-6 pb-4">
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="px-1 pb-4 space-y-4">
 
-            {/* ---- DETALHES ---- */}
+            {/* ── DETALHES ── */}
             {activeSection === 'detalhes' && (
               <div className="space-y-4">
-                {/* Current stage + SLA */}
-                <div className={cn('flex items-center gap-2 p-3 rounded-lg border', etapa?.corBg, etapa?.corBorda)}>
+                {/* Stage + SLA */}
+                <div
+                  className="flex items-center gap-2 p-3 rounded-lg border"
+                  style={{ borderColor: `${etapa?.corHex}66`, backgroundColor: `${etapa?.corHex}15` }}
+                >
                   <div className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', {
-                    'bg-green-500': slaStatus === 'ok',
-                    'bg-yellow-500': slaStatus === 'atencao',
+                    'bg-emerald-500':               slaStatus === 'ok',
+                    'bg-yellow-500':                slaStatus === 'atencao',
                     'bg-red-500 animate-sla-pulse': slaStatus === 'atrasado',
                   })} />
-                  <span className={cn('text-sm font-semibold', etapa?.cor)}>{lead.etapa_atual}</span>
+                  <span className="text-sm font-semibold" style={{ color: etapa?.corHex }}>{lead.etapa_atual}</span>
                   {lead.sla_vencimento && (
                     <span className="text-xs text-muted-foreground ml-auto">
                       SLA: {formatarTempoRelativo(lead.sla_vencimento)}
@@ -164,12 +214,11 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
                   )}
                 </div>
 
-                {/* Fields */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Nome</label>
                     {isEditing ? (
-                      <Input value={currentEditData.nome ?? ''} onChange={e => setEditData(p => ({ ...p, nome: e.target.value }))} className="h-8 text-sm" />
+                      <Input value={d.nome ?? ''} onChange={e => setEditData(p => ({ ...p, nome: e.target.value }))} className="h-8 text-sm" />
                     ) : (
                       <p className="text-sm font-medium">{lead.nome}</p>
                     )}
@@ -177,7 +226,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Telefone</label>
                     {isEditing ? (
-                      <Input value={currentEditData.telefone ?? ''} onChange={e => setEditData(p => ({ ...p, telefone: e.target.value }))} className="h-8 text-sm" />
+                      <Input value={d.telefone ?? ''} onChange={e => setEditData(p => ({ ...p, telefone: e.target.value }))} className="h-8 text-sm" />
                     ) : (
                       <p className="text-sm font-mono">{lead.telefone}</p>
                     )}
@@ -185,7 +234,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Procedimento</label>
                     {isEditing ? (
-                      <Input value={currentEditData.procedimento ?? ''} onChange={e => setEditData(p => ({ ...p, procedimento: e.target.value }))} className="h-8 text-sm" />
+                      <Input value={d.procedimento ?? ''} onChange={e => setEditData(p => ({ ...p, procedimento: e.target.value }))} className="h-8 text-sm" />
                     ) : (
                       <p className="text-sm">{lead.procedimento || '—'}</p>
                     )}
@@ -193,7 +242,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Origem</label>
                     {isEditing ? (
-                      <Select value={currentEditData.origem ?? lead.origem} onValueChange={v => setEditData(p => ({ ...p, origem: v as any }))}>
+                      <Select value={d.origem ?? lead.origem} onValueChange={v => setEditData(p => ({ ...p, origem: v }))}>
                         <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>{ORIGENS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                       </Select>
@@ -204,7 +253,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Prioridade</label>
                     {isEditing ? (
-                      <Select value={currentEditData.prioridade ?? lead.prioridade} onValueChange={v => setEditData(p => ({ ...p, prioridade: v as any }))}>
+                      <Select value={d.prioridade ?? lead.prioridade} onValueChange={v => setEditData(p => ({ ...p, prioridade: v as Lead['prioridade'] }))}>
                         <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>{PRIORIDADES.map(p => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}</SelectContent>
                       </Select>
@@ -215,41 +264,40 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Valor da Consulta</label>
                     {isEditing ? (
-                      <Input type="number" value={currentEditData.valor_consulta ?? lead.valor_consulta} onChange={e => setEditData(p => ({ ...p, valor_consulta: parseFloat(e.target.value) }))} className="h-8 text-sm" />
+                      <Input type="number" value={d.valor_consulta ?? lead.valor_consulta} onChange={e => setEditData(p => ({ ...p, valor_consulta: parseFloat(e.target.value) }))} className="h-8 text-sm" />
                     ) : (
-                      <p className="text-sm font-semibold text-emerald-500">{formatarMoeda(lead.valor_consulta)}</p>
+                      <p className="text-sm font-semibold text-emerald-600">{formatarMoeda(lead.valor_consulta)}</p>
                     )}
                   </div>
                 </div>
 
-                {/* Nota */}
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Observação</label>
                   {isEditing ? (
-                    <Textarea value={currentEditData.nota ?? lead.nota} onChange={e => setEditData(p => ({ ...p, nota: e.target.value }))} rows={3} className="text-sm" />
+                    <Textarea value={d.nota ?? lead.nota} onChange={e => setEditData(p => ({ ...p, nota: e.target.value }))} rows={3} className="text-sm" />
                   ) : (
                     <p className="text-sm text-muted-foreground bg-muted/50 rounded p-2 min-h-[40px]">{lead.nota || 'Sem observações.'}</p>
                   )}
                 </div>
 
-                {/* URL Chatwoot */}
                 {isEditing && (
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">URL Chatwoot</label>
-                    <Input value={currentEditData.chatwoot_url ?? lead.chatwoot_url} onChange={e => setEditData(p => ({ ...p, chatwoot_url: e.target.value }))} className="h-8 text-sm" placeholder="https://..." />
+                    <Input value={d.chatwoot_url ?? lead.chatwoot_url} onChange={e => setEditData(p => ({ ...p, chatwoot_url: e.target.value }))} className="h-8 text-sm" placeholder="https://..." />
                   </div>
                 )}
 
-                {/* Move to stage */}
+                {/* Mover para etapa */}
                 <div>
                   <label className="text-xs text-muted-foreground mb-2 block">Mover para etapa</label>
                   <div className="flex flex-wrap gap-1.5">
-                    {ETAPAS.filter(e => e.id !== lead.etapa_atual).map(e => (
+                    {etapasParaMover.map(e => (
                       <button
                         key={e.id}
                         onClick={() => handleMoverPara(e.id)}
                         disabled={loading}
-                        className={cn('flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-colors hover:opacity-80', e.corBg, e.corBorda, e.cor)}
+                        className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-colors hover:opacity-80"
+                        style={{ borderColor: `${e.corHex}80`, color: e.corHex, backgroundColor: `${e.corHex}15` }}
                       >
                         <ArrowRight className="h-2.5 w-2.5" />
                         {e.nome}
@@ -264,16 +312,215 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
               </div>
             )}
 
-            {/* ---- HISTÓRICO ---- */}
+            {/* ── PERFIL ── */}
+            {activeSection === 'perfil' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Data de Nascimento</label>
+                    {isEditing ? (
+                      <Input type="date" value={d.data_nascimento ?? lead.data_nascimento ?? ''} onChange={e => setEditData(p => ({ ...p, data_nascimento: e.target.value }))} className="h-8 text-sm" />
+                    ) : (
+                      <p className="text-sm">{lead.data_nascimento ? `${lead.data_nascimento} (${idade} anos)` : '—'}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Sexo</label>
+                    {isEditing ? (
+                      <Select value={d.sexo ?? lead.sexo ?? ''} onValueChange={v => setEditData(p => ({ ...p, sexo: v }))}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="M">Masculino</SelectItem>
+                          <SelectItem value="F">Feminino</SelectItem>
+                          <SelectItem value="Outro">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm">{lead.sexo || '—'}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Estado Civil</label>
+                    {isEditing ? (
+                      <Select value={d.estado_civil ?? lead.estado_civil ?? ''} onValueChange={v => setEditData(p => ({ ...p, estado_civil: v }))}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                        <SelectContent>
+                          {['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União Estável'].map(v => (
+                            <SelectItem key={v} value={v}>{v}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm">{lead.estado_civil || '—'}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Profissão</label>
+                    {isEditing ? (
+                      <Input value={d.profissao ?? lead.profissao ?? ''} onChange={e => setEditData(p => ({ ...p, profissao: e.target.value }))} className="h-8 text-sm" />
+                    ) : (
+                      <p className="text-sm">{lead.profissao || '—'}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">CPF</label>
+                    {isEditing ? (
+                      <Input value={d.cpf ?? lead.cpf ?? ''} onChange={e => setEditData(p => ({ ...p, cpf: e.target.value }))} className="h-8 text-sm" placeholder="000.000.000-00" />
+                    ) : (
+                      <p className="text-sm font-mono">{lead.cpf || '—'}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">RG</label>
+                    {isEditing ? (
+                      <Input value={d.rg ?? lead.rg ?? ''} onChange={e => setEditData(p => ({ ...p, rg: e.target.value }))} className="h-8 text-sm" />
+                    ) : (
+                      <p className="text-sm font-mono">{lead.rg || '—'}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-border pt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Endereço</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { key: 'endereco',    label: 'Logradouro',   span: true  },
+                      { key: 'numero',      label: 'Número',       span: false },
+                      { key: 'complemento', label: 'Complemento',  span: false },
+                      { key: 'bairro',      label: 'Bairro',       span: false },
+                      { key: 'cep',         label: 'CEP',          span: false },
+                      { key: 'cidade',      label: 'Cidade',       span: false },
+                      { key: 'estado',      label: 'Estado (UF)',  span: false },
+                    ].map(({ key, label, span }) => (
+                      <div key={key} className={span ? 'col-span-2' : ''}>
+                        <label className="text-xs text-muted-foreground mb-1 block">{label}</label>
+                        {isEditing ? (
+                          <Input
+                            value={(d as unknown as Record<string, string>)[key] ?? (lead as unknown as Record<string, string>)[key] ?? ''}
+                            onChange={e => setEditData(p => ({ ...p, [key]: e.target.value }))}
+                            className="h-8 text-sm"
+                          />
+                        ) : (
+                          <p className="text-sm">{(lead as unknown as Record<string, string>)[key] || '—'}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-border pt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Como Conheceu / Indicação</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Como conheceu</label>
+                      {isEditing ? (
+                        <Input value={d.como_conheceu ?? lead.como_conheceu ?? ''} onChange={e => setEditData(p => ({ ...p, como_conheceu: e.target.value }))} className="h-8 text-sm" placeholder="Ex: Indicação amigo" />
+                      ) : (
+                        <p className="text-sm">{lead.como_conheceu || '—'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Foi Indicação?</label>
+                      {isEditing ? (
+                        <Select value={String(d.foi_indicacao ?? lead.foi_indicacao ?? false)} onValueChange={v => setEditData(p => ({ ...p, foi_indicacao: v === 'true' }))}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="true">Sim</SelectItem>
+                            <SelectItem value="false">Não</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm">{lead.foi_indicacao ? '✅ Sim' : 'Não'}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tags */}
+                <div className="border-t border-border pt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Tags Clínicas</p>
+                  {isEditing ? (
+                    <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                      {TAGS.map(tag => {
+                        const selected = (d.tags ?? lead.tags ?? []).includes(tag);
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => toggleTag(tag)}
+                            className={cn(
+                              'px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors',
+                              selected
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-muted text-muted-foreground border-border hover:border-primary/50'
+                            )}
+                          >
+                            {formatarTag(tag)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {(lead.tags ?? []).length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Nenhuma tag.</p>
+                      ) : (lead.tags ?? []).map(tag => (
+                        <span key={tag} className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-medium">
+                          {formatarTag(tag)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 border-t border-border pt-3">
+                  <div className="text-center">
+                    <p className="text-[10px] text-muted-foreground">Consultas</p>
+                    <p className="text-lg font-bold">{lead.numero_consultas ?? 0}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-muted-foreground">Total Investido</p>
+                    <p className="text-sm font-bold text-emerald-600">{formatarMoeda(lead.total_investido ?? 0)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-muted-foreground">Follow-ups</p>
+                    <p className="text-lg font-bold">{lead.followup_tentativas ?? 0}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── FINANCEIRO ── */}
+            {activeSection === 'financeiro' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold">Total: {formatarMoeda(totalFinanceiro)}</p>
+                  <span className="text-xs text-muted-foreground">{financeiro.length} registros</span>
+                </div>
+                {financeiro.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">Nenhum registro financeiro.</p>
+                ) : financeiro.map(f => (
+                  <div key={f.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium">{f.descricao || f.tipo}</p>
+                      <p className="text-[10px] text-muted-foreground">{f.tipo} · {formatarData(f.data_registro)}</p>
+                    </div>
+                    <p className="text-sm font-bold text-emerald-600">{formatarMoeda(f.valor)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── HISTÓRICO ── */}
             {activeSection === 'historico' && (
               <div className="space-y-2">
                 {historico.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">Nenhuma movimentação registrada.</p>
+                  <p className="text-sm text-muted-foreground text-center py-6">Nenhuma movimentação.</p>
                 ) : historico.map((h, i) => (
                   <div key={h.id} className="flex items-start gap-3">
                     <div className="flex flex-col items-center">
                       <div className={cn('w-2 h-2 rounded-full mt-1 flex-shrink-0', h.movido_por === 'n8n' ? 'bg-blue-500' : 'bg-primary')} />
-                      {i < historico.length - 1 && <div className="w-px flex-1 bg-border mt-1" style={{ minHeight: '20px' }} />}
+                      {i < historico.length - 1 && <div className="w-px flex-1 bg-border mt-1" style={{ minHeight: 20 }} />}
                     </div>
                     <div className="flex-1 pb-3">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -296,10 +543,9 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
               </div>
             )}
 
-            {/* ---- NOTAS ---- */}
+            {/* ── NOTAS ── */}
             {activeSection === 'notas' && (
               <div className="space-y-3">
-                {/* Add note form */}
                 <div className="p-3 border border-border rounded-lg space-y-2 bg-muted/20">
                   <Textarea
                     placeholder="Adicionar nova nota..."
@@ -320,16 +566,12 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
                     </Button>
                   </div>
                 </div>
-
-                {/* Notes list */}
                 {notas.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Nenhuma nota registrada.</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">Nenhuma nota.</p>
                 ) : notas.map(n => (
                   <div key={n.id} className="p-3 border border-border rounded-lg bg-muted/10">
                     <p className="text-sm">{n.conteudo}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      {n.autor} · {formatarData(n.criado_em)}
-                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">{n.autor} · {formatarData(n.criado_em)}</p>
                   </div>
                 ))}
               </div>
@@ -338,8 +580,8 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
           </div>
         </ScrollArea>
 
-        {/* Footer actions */}
-        <div className="flex items-center justify-between px-6 py-3 border-t border-border">
+        {/* Footer */}
+        <div className="flex items-center justify-between px-1 py-3 border-t border-border flex-shrink-0">
           <div>
             {isEditing ? (
               <div className="flex gap-2">
@@ -356,7 +598,9 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
               </Button>
             )}
           </div>
-          <Button onClick={onClose} variant="ghost" size="sm">Fechar</Button>
+          <Button onClick={onClose} variant="ghost" size="sm">
+            <X className="h-4 w-4 mr-1" /> Fechar
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

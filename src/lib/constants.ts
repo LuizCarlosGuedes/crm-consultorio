@@ -1,165 +1,47 @@
 import { Stage } from './types';
 
-export const ETAPAS: Stage[] = [
-  {
-    id: 'Novo Lead',
-    nome: 'Novo Lead',
-    cor: 'text-blue-400',
-    corBg: 'bg-blue-500/10',
-    corBorda: 'border-blue-500/40',
-    corHex: '#3B82F6',
-    slaMinutos: 0.5,
-    slaLabel: '30 seg',
-  },
-  {
-    id: 'Triagem IA',
-    nome: 'Triagem IA',
-    cor: 'text-indigo-400',
-    corBg: 'bg-indigo-500/10',
-    corBorda: 'border-indigo-500/40',
-    corHex: '#6366F1',
-    slaMinutos: 10,
-    slaLabel: '10 min',
-  },
-  {
-    id: 'Qualificado',
-    nome: 'Qualificado',
-    cor: 'text-violet-400',
-    corBg: 'bg-violet-500/10',
-    corBorda: 'border-violet-500/40',
-    corHex: '#8B5CF6',
-    slaMinutos: 1440,
-    slaLabel: '24h',
-  },
-  {
-    id: 'Proposta Consulta',
-    nome: 'Proposta Consulta',
-    cor: 'text-pink-400',
-    corBg: 'bg-pink-500/10',
-    corBorda: 'border-pink-500/40',
-    corHex: '#EC4899',
-    slaMinutos: 1440,
-    slaLabel: '24h',
-  },
-  {
-    id: 'Agendando',
-    nome: 'Agendando',
-    cor: 'text-amber-400',
-    corBg: 'bg-amber-500/10',
-    corBorda: 'border-amber-500/40',
-    corHex: '#F59E0B',
-    slaMinutos: 120,
-    slaLabel: '2h',
-  },
-  {
-    id: 'Agendado',
-    nome: 'Agendado',
-    cor: 'text-orange-400',
-    corBg: 'bg-orange-500/10',
-    corBorda: 'border-orange-500/40',
-    corHex: '#F97316',
-    slaMinutos: 10080,
-    slaLabel: 'Até consulta',
-  },
-  {
-    id: 'Pago / Confirmado',
-    nome: 'Pago / Confirmado',
-    cor: 'text-emerald-400',
-    corBg: 'bg-emerald-500/10',
-    corBorda: 'border-emerald-500/40',
-    corHex: '#10B981',
-    slaMinutos: 1440,
-    slaLabel: 'Até D-0',
-  },
-  {
-    id: 'Compareceu',
-    nome: 'Compareceu',
-    cor: 'text-cyan-400',
-    corBg: 'bg-cyan-500/10',
-    corBorda: 'border-cyan-500/40',
-    corHex: '#06B6D4',
-    slaMinutos: 1440,
-    slaLabel: '1 dia',
-  },
-  {
-    id: 'No Show',
-    nome: 'No Show',
-    cor: 'text-red-400',
-    corBg: 'bg-red-500/10',
-    corBorda: 'border-red-500/40',
-    corHex: '#EF4444',
-    slaMinutos: 15,
-    slaLabel: '15 min',
-  },
-  {
-    id: 'Pós Consulta',
-    nome: 'Pós Consulta',
-    cor: 'text-teal-400',
-    corBg: 'bg-teal-500/10',
-    corBorda: 'border-teal-500/40',
-    corHex: '#14B8A6',
-    slaMinutos: 10080,
-    slaLabel: '7 dias',
-  },
-  {
-    id: 'Follow-up',
-    nome: 'Follow-up',
-    cor: 'text-purple-400',
-    corBg: 'bg-purple-500/10',
-    corBorda: 'border-purple-500/40',
-    corHex: '#9333EA',
-    slaMinutos: 4320,
-    slaLabel: '3 dias',
-  },
-  {
-    id: 'Retorno Marcado',
-    nome: 'Retorno Marcado',
-    cor: 'text-green-400',
-    corBg: 'bg-green-500/10',
-    corBorda: 'border-green-500/40',
-    corHex: '#22C55E',
-    slaMinutos: 43200,
-    slaLabel: 'Até retorno',
-  },
-  {
-    id: 'Recorrente',
-    nome: 'Recorrente',
-    cor: 'text-lime-400',
-    corBg: 'bg-lime-500/10',
-    corBorda: 'border-lime-500/40',
-    corHex: '#84CC16',
-    slaMinutos: 43200,
-    slaLabel: 'Mensal',
-  },
-  {
-    id: 'Perdido',
-    nome: 'Perdido',
-    cor: 'text-gray-400',
-    corBg: 'bg-gray-500/10',
-    corBorda: 'border-gray-500/40',
-    corHex: '#6B7280',
-    slaMinutos: 129600,
-    slaLabel: '90 dias',
-  },
-  {
-    id: 'Reativação',
-    nome: 'Reativação',
-    cor: 'text-rose-400',
-    corBg: 'bg-rose-500/10',
-    corBorda: 'border-rose-500/40',
-    corHex: '#F43F5E',
-    slaMinutos: 129600,
-    slaLabel: 'Sazonal',
-  },
+export const PIPELINE_1: Stage[] = [
+  { id: 'Novo Lead',        nome: 'Novo Lead',        cor: 'text-blue-500',    corBg: 'bg-blue-500/15',    corBorda: 'border-blue-500/60',    corHex: '#3B82F6', slaMinutos: 0.5,    slaLabel: '30 seg',       pipeline: 1 },
+  { id: 'Triagem IA',       nome: 'Triagem IA',       cor: 'text-indigo-500',  corBg: 'bg-indigo-500/15',  corBorda: 'border-indigo-500/60',  corHex: '#6366F1', slaMinutos: 10,     slaLabel: '10 min',       pipeline: 1 },
+  { id: 'Qualificado',      nome: 'Qualificado',      cor: 'text-violet-500',  corBg: 'bg-violet-500/15',  corBorda: 'border-violet-500/60',  corHex: '#8B5CF6', slaMinutos: 1440,   slaLabel: '24h',          pipeline: 1 },
+  { id: 'Proposta Enviada', nome: 'Proposta Enviada', cor: 'text-pink-500',    corBg: 'bg-pink-500/15',    corBorda: 'border-pink-500/60',    corHex: '#EC4899', slaMinutos: 1440,   slaLabel: '24h',          pipeline: 1 },
+  { id: 'Sinal Pago',       nome: 'Sinal Pago',       cor: 'text-emerald-600', corBg: 'bg-emerald-500/15', corBorda: 'border-emerald-500/60', corHex: '#10B981', slaMinutos: 1440,   slaLabel: 'Até D-0',      pipeline: 1 },
+  { id: 'Agendado',         nome: 'Agendado',         cor: 'text-orange-500',  corBg: 'bg-orange-500/15',  corBorda: 'border-orange-500/60',  corHex: '#F97316', slaMinutos: 10080,  slaLabel: 'Até consulta', pipeline: 1 },
+  { id: 'No Show',          nome: 'No Show',          cor: 'text-red-600',     corBg: 'bg-red-500/15',     corBorda: 'border-red-500/60',     corHex: '#EF4444', slaMinutos: 15,     slaLabel: '15 min',       pipeline: 1 },
+  { id: 'Reagendamento',    nome: 'Reagendamento',    cor: 'text-amber-600',   corBg: 'bg-amber-500/15',   corBorda: 'border-amber-500/60',   corHex: '#F59E0B', slaMinutos: 120,    slaLabel: '2h',           pipeline: 1 },
+  { id: 'Follow-up',        nome: 'Follow-up',        cor: 'text-purple-500',  corBg: 'bg-purple-500/15',  corBorda: 'border-purple-500/60',  corHex: '#9333EA', slaMinutos: 4320,   slaLabel: '3 dias',       pipeline: 1 },
+  { id: 'Perdido',          nome: 'Perdido',          cor: 'text-gray-500',    corBg: 'bg-gray-500/15',    corBorda: 'border-gray-500/60',    corHex: '#6B7280', slaMinutos: 129600, slaLabel: '90 dias',      pipeline: 1 },
+  { id: 'Reativação',       nome: 'Reativação',       cor: 'text-rose-500',    corBg: 'bg-rose-500/15',    corBorda: 'border-rose-500/60',    corHex: '#F43F5E', slaMinutos: 129600, slaLabel: 'Sazonal',      pipeline: 1 },
+  { id: 'Nutrição',         nome: 'Nutrição',         cor: 'text-teal-500',    corBg: 'bg-teal-500/15',    corBorda: 'border-teal-500/60',    corHex: '#14B8A6', slaMinutos: 10080,  slaLabel: 'Semanal',      pipeline: 1 },
 ];
+
+export const PIPELINE_2: Stage[] = [
+  { id: 'Retorno Solicitado', nome: 'Retorno Solicitado', cor: 'text-blue-500',   corBg: 'bg-blue-500/15',   corBorda: 'border-blue-500/60',   corHex: '#3B82F6', slaMinutos: 120,   slaLabel: '2h',           pipeline: 2 },
+  { id: 'Agendado P2',        nome: 'Agendado',           cor: 'text-orange-500', corBg: 'bg-orange-500/15', corBorda: 'border-orange-500/60', corHex: '#F97316', slaMinutos: 10080, slaLabel: 'Até consulta', pipeline: 2 },
+  { id: 'Compareceu',         nome: 'Compareceu',         cor: 'text-cyan-600',   corBg: 'bg-cyan-500/15',   corBorda: 'border-cyan-500/60',   corHex: '#06B6D4', slaMinutos: 1440,  slaLabel: '1 dia',        pipeline: 2 },
+  { id: 'Pós Consulta',       nome: 'Pós Consulta',       cor: 'text-teal-600',   corBg: 'bg-teal-500/15',   corBorda: 'border-teal-500/60',   corHex: '#14B8A6', slaMinutos: 10080, slaLabel: '7 dias',       pipeline: 2 },
+  { id: 'Recorrente',         nome: 'Recorrente',         cor: 'text-lime-600',   corBg: 'bg-lime-500/15',   corBorda: 'border-lime-500/60',   corHex: '#84CC16', slaMinutos: 43200, slaLabel: 'Mensal',       pipeline: 2 },
+];
+
+export const TODAS_ETAPAS: Stage[] = [...PIPELINE_1, ...PIPELINE_2];
 
 export const ORIGENS = ['Instagram', 'Google', 'WhatsApp', 'Indicação'];
 export const PRIORIDADES = ['urgente', 'alta', 'normal', 'frio'];
 
-export const ETAPAS_ATIVAS = ETAPAS
-  .filter(e => !['Perdido'].includes(e.id))
-  .map(e => e.id);
-
 export const SLA_MINUTOS: Record<string, number> = Object.fromEntries(
-  ETAPAS.map(e => [e.id, e.slaMinutos])
+  TODAS_ETAPAS.map(e => [e.id, e.slaMinutos])
 );
+
+export const TAGS = [
+  'obesidade', 'sobrepeso', 'emagrecimento', 'resistencia_insulina', 'diabetes',
+  'sindrome_metabolica', 'colesterol_alto', 'triglicerides', 'esteatose_hepatica',
+  'hipertensao', 'saude_cardiovascular', 'menopausa', 'climaterio', 'fogachos',
+  'tpm', 'sop', 'andropausa', 'baixa_testosterona', 'disfuncao_eretil', 'libido_baixa',
+  'disfuncoes_hormonais', 'tireoide', 'equilibrio_hormonal', 'fadiga_cronica',
+  'baixa_imunidade', 'inflamacao_cronica', 'deficiencia_vitaminica', 'deficiencia_mineral',
+  'anemia', 'sarcopenia', 'nutricao_esportiva', 'performance_fisica', 'disbiose',
+  'intestino_irritavel', 'constipacao', 'refluxo', 'gastrite', 'acne_hormonal',
+  'queda_cabelo', 'unhas_fracas', 'pele', 'antienvelhecimento', 'longevidade',
+  'estresse_oxidativo', 'gestacao', 'pos_parto', 'amamentacao', 'pediatria',
+  'idoso', 'protocolo_coimbra', 'autoimune', 'bariatrica', 'saude_cerebral',
+];

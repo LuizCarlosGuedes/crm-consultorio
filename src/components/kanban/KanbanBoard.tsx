@@ -4,25 +4,24 @@ import React, { useState } from 'react';
 import {
   DndContext,
   DragEndEvent,
-  DragOverEvent,
   DragOverlay,
   DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { Lead } from '@/lib/types';
-import { ETAPAS } from '@/lib/constants';
+import { Lead, Stage } from '@/lib/types';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanCard } from './KanbanCard';
 
 interface KanbanBoardProps {
+  stages: Stage[];
   leads: Lead[];
   onMoveCard: (leadId: string, newStage: string) => Promise<void>;
   onCardClick: (lead: Lead) => void;
 }
 
-export function KanbanBoard({ leads, onMoveCard, onCardClick }: KanbanBoardProps) {
+export function KanbanBoard({ stages, leads, onMoveCard, onCardClick }: KanbanBoardProps) {
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
 
   const sensors = useSensors(
@@ -39,17 +38,15 @@ export function KanbanBoard({ leads, onMoveCard, onCardClick }: KanbanBoardProps
     setActiveLead(null);
     if (!over) return;
 
-    const leadId  = active.id as string;
-    const overId  = over.id  as string;
+    const leadId = active.id as string;
+    const overId = over.id as string;
 
-    // Determine target stage
-    const isColumnId = ETAPAS.some(e => e.id === overId);
+    const isStageId = stages.some(s => s.id === overId);
     let targetStage: string;
 
-    if (isColumnId) {
+    if (isStageId) {
       targetStage = overId;
     } else {
-      // Dropped on another card — find its stage
       const targetLead = leads.find(l => l.id === overId);
       if (!targetLead) return;
       targetStage = targetLead.etapa_atual;
@@ -68,7 +65,7 @@ export function KanbanBoard({ leads, onMoveCard, onCardClick }: KanbanBoardProps
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-3 overflow-x-auto pb-4 px-1">
-        {ETAPAS.map(stage => (
+        {stages.map(stage => (
           <KanbanColumn
             key={stage.id}
             stage={stage}

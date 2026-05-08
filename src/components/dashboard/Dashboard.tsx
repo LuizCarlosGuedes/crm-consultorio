@@ -9,7 +9,7 @@ import { subWeeks, subMonths, startOfWeek, startOfMonth, format, isAfter, isBefo
 import { ptBR } from 'date-fns/locale';
 import { Users, Activity, TrendingUp, DollarSign, Repeat2, AlertTriangle, HeartPulse } from 'lucide-react';
 import { Lead } from '@/lib/types';
-import { ETAPAS } from '@/lib/constants';
+import { TODAS_ETAPAS } from '@/lib/constants';
 import { calcSLAStatus, formatarMoeda, cn } from '@/lib/utils';
 
 interface DashboardProps {
@@ -48,13 +48,13 @@ export function Dashboard({ leads }: DashboardProps) {
     const total = leads.length;
     const ativos = leads.filter(l => !['Perdido'].includes(l.etapa_atual)).length;
     const compareceram = leads.filter(l => l.etapa_atual === 'Compareceu').length;
-    const pagos = leads.filter(l => l.etapa_atual === 'Pago / Confirmado').length;
+    const pagos = leads.filter(l => ['Sinal Pago', 'Pago / Confirmado'].includes(l.etapa_atual)).length;
     const recorrentes = leads.filter(l => l.etapa_atual === 'Recorrente').length;
     const noShow = leads.filter(l => l.etapa_atual === 'No Show').length;
 
     const receitaConfirmada = leads
-      .filter(l => ['Pago / Confirmado', 'Compareceu', 'Recorrente'].includes(l.etapa_atual))
-      .reduce((s, l) => s + (l.valor_consulta || 0), 0);
+      .filter(l => ['Sinal Pago', 'Compareceu', 'Recorrente', 'Pós Consulta'].includes(l.etapa_atual))
+      .reduce((s, l) => s + (l.total_investido || l.valor_consulta || 0), 0);
 
     const taxaConversao = total > 0 ? (compareceram / total) * 100 : 0;
     const ticketMedio = compareceram > 0
@@ -135,7 +135,7 @@ export function Dashboard({ leads }: DashboardProps) {
 
   // Distribuição por etapa
   const distribuicaoPorEtapa = useMemo(() => {
-    return ETAPAS.map(e => ({
+    return TODAS_ETAPAS.map(e => ({
       etapa: e,
       count: leads.filter(l => l.etapa_atual === e.id).length,
     })).filter(x => x.count > 0);
@@ -250,7 +250,7 @@ export function Dashboard({ leads }: DashboardProps) {
         <div className="bg-card border border-border rounded-lg p-4">
           <h3 className="text-sm font-semibold mb-3">Distribuição por Etapa</h3>
           <div className="space-y-1.5 max-h-80 overflow-y-auto">
-            {ETAPAS.map(e => {
+            {TODAS_ETAPAS.map(e => {
               const count = leads.filter(l => l.etapa_atual === e.id).length;
               const pct = leads.length > 0 ? (count / leads.length) * 100 : 0;
               return (

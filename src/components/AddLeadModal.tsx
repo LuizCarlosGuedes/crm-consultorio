@@ -11,10 +11,8 @@ import { ORIGENS, PRIORIDADES } from '@/lib/constants';
 interface AddLeadModalProps {
   open: boolean;
   onClose: () => void;
-  onAdd: (data: {
-    nome: string; telefone: string; origem: string; procedimento: string;
-    prioridade: string; nota: string; valor_consulta: number; chatwoot_url: string;
-  }) => Promise<void>;
+  onAdd: (data: Record<string, unknown>) => Promise<void>;
+  defaultPipelineId?: 1 | 2;
 }
 
 const DEFAULT_FORM = {
@@ -22,7 +20,7 @@ const DEFAULT_FORM = {
   prioridade: 'normal', nota: '', valor_consulta: '', chatwoot_url: '',
 };
 
-export function AddLeadModal({ open, onClose, onAdd }: AddLeadModalProps) {
+export function AddLeadModal({ open, onClose, onAdd, defaultPipelineId = 1 }: AddLeadModalProps) {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [loading, setLoading] = useState(false);
 
@@ -37,17 +35,20 @@ export function AddLeadModal({ open, onClose, onAdd }: AddLeadModalProps) {
     await onAdd({
       ...form,
       valor_consulta: parseFloat(form.valor_consulta) || 0,
+      pipeline_id: defaultPipelineId,
     });
     setForm(DEFAULT_FORM);
     setLoading(false);
     onClose();
   }
 
+  const pipelineLabel = defaultPipelineId === 2 ? 'Pacientes Ativos (P2)' : 'Captação (P1)';
+
   return (
     <Dialog open={open} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Novo Lead</DialogTitle>
+          <DialogTitle>Novo Lead — {pipelineLabel}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
@@ -74,7 +75,7 @@ export function AddLeadModal({ open, onClose, onAdd }: AddLeadModalProps) {
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Procedimento</label>
                 <Input
-                  placeholder="Ex: Consulta Dermatológica"
+                  placeholder="Ex: Consulta Hormonal"
                   value={form.procedimento}
                   onChange={e => setField('procedimento', e.target.value)}
                 />
@@ -98,7 +99,7 @@ export function AddLeadModal({ open, onClose, onAdd }: AddLeadModalProps) {
                 </Select>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Valor da Consulta (R$)</label>
+                <label className="text-xs text-muted-foreground mb-1 block">Valor (R$)</label>
                 <Input
                   type="number"
                   placeholder="0.00"
