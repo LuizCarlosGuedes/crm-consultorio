@@ -28,7 +28,7 @@ export function KanbanColumn({ stage, leads, onCardClick }: KanbanColumnProps) {
         className="flex items-center justify-between px-3 py-2 rounded-t-lg"
         style={{
           backgroundColor: '#0b1a35',
-          borderTop:   `3px solid ${stage.corHex}`,
+          borderTop:   `6px solid ${stage.corHex}`,
           borderLeft:  `1px solid ${stage.corHex}55`,
           borderRight: `1px solid ${stage.corHex}55`,
         }}
@@ -59,7 +59,7 @@ export function KanbanColumn({ stage, leads, onCardClick }: KanbanColumnProps) {
         </div>
 
         {/* SLA label */}
-        <span className="text-[9px] flex-shrink-0 ml-1 font-mono" style={{ color: '#e0e0e0' }}>
+        <span className="text-[12px] flex-shrink-0 ml-1 font-mono" style={{ color: '#e0e0e0' }}>
           {stage.slaLabel}
         </span>
       </div>
