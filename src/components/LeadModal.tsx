@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  ExternalLink, ArrowRight, Edit2, Save, Plus, X,
+  ExternalLink, ArrowRight, Edit2, Save, Plus, X, Trash2, Loader2,
 } from 'lucide-react';
 import { Lead, HistoricoMovimentacao, Nota, Financeiro } from '@/lib/types';
 import { PIPELINE_1, PIPELINE_2, ORIGENS, PRIORIDADES, TAGS } from '@/lib/constants';
@@ -10,7 +10,7 @@ import {
   calcSLAStatus, formatarData, formatarMoeda, formatarTempoRelativo,
   getOrigemIcon, getEtapa, calcularIdade, formatarTag, cn,
 } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -22,20 +22,23 @@ interface LeadModalProps {
   onClose: () => void;
   onUpdate: (id: string, data: Partial<Lead>) => Promise<void>;
   onMoveCard: (leadId: string, newStage: string) => Promise<void>;
+  onDeleteCard?: (lead: Lead) => Promise<void>;
 }
 
 type Section = 'detalhes' | 'perfil' | 'financeiro' | 'historico' | 'notas';
 
-export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProps) {
-  const [isEditing,    setIsEditing]    = useState(false);
-  const [editData,     setEditData]     = useState<Partial<Lead>>({});
-  const [historico,    setHistorico]    = useState<HistoricoMovimentacao[]>([]);
-  const [notas,        setNotas]        = useState<Nota[]>([]);
-  const [financeiro,   setFinanceiro]   = useState<Financeiro[]>([]);
-  const [newNota,      setNewNota]      = useState('');
-  const [newNotaAutor, setNewNotaAutor] = useState('Atendente');
-  const [loading,      setLoading]      = useState(false);
-  const [activeSection, setActiveSection] = useState<Section>('detalhes');
+export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }: LeadModalProps) {
+  const [isEditing,         setIsEditing]         = useState(false);
+  const [editData,          setEditData]          = useState<Partial<Lead>>({});
+  const [historico,         setHistorico]         = useState<HistoricoMovimentacao[]>([]);
+  const [notas,             setNotas]             = useState<Nota[]>([]);
+  const [financeiro,        setFinanceiro]        = useState<Financeiro[]>([]);
+  const [newNota,           setNewNota]           = useState('');
+  const [newNotaAutor,      setNewNotaAutor]      = useState('Atendente');
+  const [loading,           setLoading]           = useState(false);
+  const [activeSection,     setActiveSection]     = useState<Section>('detalhes');
+  const [confirmDelete,     setConfirmDelete]     = useState(false);
+  const [deleteLoading,     setDeleteLoading]     = useState(false);
 
   useEffect(() => {
     if (!lead) return;
@@ -102,6 +105,18 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
       ? current.filter(t => t !== tag)
       : [...current, tag];
     setEditData(p => ({ ...p, tags: next }));
+  }
+
+  async function handleDeleteConfirm() {
+    if (!lead || !onDeleteCard || deleteLoading) return;
+    setDeleteLoading(true);
+    try {
+      await onDeleteCard(lead);
+      setConfirmDelete(false);
+      onClose();
+    } finally {
+      setDeleteLoading(false);
+    }
   }
 
   if (!lead) return null;
@@ -584,7 +599,26 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
 
         {/* Footer */}
         <div className="flex items-center justify-between px-1 py-3 border-t border-border flex-shrink-0">
-          <div>
+          <div className="flex items-center gap-2">
+            {/* Excluir Lead */}
+            {onDeleteCard && !isEditing && (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="px-2.5 py-1.5 rounded text-xs font-medium border transition-colors"
+                style={{ color: '#EF4444', borderColor: '#EF444440' }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#EF444412';
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = '#EF444470';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = '';
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = '#EF444440';
+                }}
+              >
+                Excluir Lead
+              </button>
+            )}
+            {/* Editar / Salvar */}
             {isEditing ? (
               <div className="flex gap-2">
                 <Button onClick={handleSave} disabled={loading} size="sm" className="gap-1">
@@ -605,6 +639,35 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
           </Button>
         </div>
       </DialogContent>
+
+      {/* Dialog de confirmação de exclusão */}
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir lead?</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir <strong>{lead.nome}</strong>? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setConfirmDelete(false)} variant="outline" size="sm">
+              Cancelar
+            </Button>
+            <button
+              onClick={handleDeleteConfirm}
+              disabled={deleteLoading}
+              className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium text-white transition-colors disabled:opacity-60"
+              style={{ backgroundColor: '#EF4444' }}
+            >
+              {deleteLoading
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Trash2  className="h-3.5 w-3.5" />
+              }
+              {deleteLoading ? 'Excluindo...' : 'Excluir'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

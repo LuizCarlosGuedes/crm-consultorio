@@ -251,7 +251,6 @@ export default function Home() {
                   onMoveCard={handleMoveCard}
                   onCardClick={setSelectedLead}
                   onPacienteConsultou={handlePacienteConsultou}
-                  onDeleteCard={handleDeleteCard}
                   onQuickNota={handleQuickNota}
                 />
               </div>
@@ -273,7 +272,6 @@ export default function Home() {
                   leads={leadsP2}
                   onMoveCard={handleMoveCard}
                   onCardClick={setSelectedLead}
-                  onDeleteCard={handleDeleteCard}
                   onQuickNota={handleQuickNota}
                 />
               </div>
@@ -305,6 +303,7 @@ export default function Home() {
         onClose={() => setSelectedLead(null)}
         onUpdate={handleUpdateLead}
         onMoveCard={handleMoveCard}
+        onDeleteCard={handleDeleteCard}
       />
 
       <AddLeadModal
