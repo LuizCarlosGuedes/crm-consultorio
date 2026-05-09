@@ -3,8 +3,12 @@
 import React, { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ExternalLink, Phone, Tag, Stethoscope, Loader2 } from 'lucide-react';
+import { ExternalLink, Phone, Tag, Stethoscope, Loader2, Trash2 } from 'lucide-react';
 import { Lead } from '@/lib/types';
+import {
+  Dialog, DialogContent, DialogHeader, DialogFooter,
+  DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import {
   calcSLAStatus, formatarTempoRelativo, formatarMoeda,
   getOrigemIcon, calcularIdade, formatarTag, getEtapa, cn,
@@ -15,6 +19,7 @@ interface KanbanCardProps {
   onClick: (lead: Lead) => void;
   isOverlay?: boolean;
   onPacienteConsultou?: (lead: Lead) => Promise<void>;
+  onDeleteCard?: (lead: Lead) => Promise<void>;
 }
 
 const ETAPAS_COM_BOTAO_CONSULTOU = new Set(['Agendado', 'Sinal Pago']);
@@ -34,8 +39,10 @@ const PRIO_BADGE: Record<string, string> = {
   frio:    'bg-slate-100  text-slate-600  border border-slate-300  dark:bg-slate-800     dark:text-slate-400  dark:border-slate-600',
 };
 
-export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou }: KanbanCardProps) {
+export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onDeleteCard }: KanbanCardProps) {
   const [consultandoLoading, setConsultandoLoading] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen]   = useState(false);
+  const [deleteLoading,      setDeleteLoading]       = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: lead.id });
@@ -45,6 +52,23 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou }: Ka
     lead.pipeline_id === 1 &&
     ETAPAS_COM_BOTAO_CONSULTOU.has(lead.etapa_atual) &&
     !!onPacienteConsultou;
+
+  function handleTrashClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    setConfirmDeleteOpen(true);
+  }
+
+  async function handleConfirmDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!onDeleteCard || deleteLoading) return;
+    setDeleteLoading(true);
+    try {
+      await onDeleteCard(lead);
+      setConfirmDeleteOpen(false);
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
 
   async function handleConsultou(e: React.MouseEvent) {
     e.stopPropagation();
@@ -94,6 +118,16 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou }: Ka
       )}
       onClick={() => onClick(lead)}
     >
+      {/* ── Botão excluir (hover-only, absoluto) ─────── */}
+      {!isOverlay && onDeleteCard && (
+        <button
+          onClick={handleTrashClick}
+          title="Excluir lead"
+          className="absolute top-1.5 right-1.5 z-10 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      )}
       <div className="px-3 pt-2.5 pb-2 space-y-1.5">
 
         {/* ── Header: origem + nome + prioridade ───────── */}
@@ -196,6 +230,37 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou }: Ka
             </button>
           )}
         </div>
+
+        {/* ── Modal de confirmação de exclusão ─────────── */}
+        <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+          <DialogContent className="max-w-sm" onClick={e => e.stopPropagation()}>
+            <DialogHeader>
+              <DialogTitle>Excluir lead?</DialogTitle>
+              <DialogDescription>
+                Tem certeza que deseja excluir <strong>{lead.nome}</strong>? Esta ação não pode ser desfeita.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <button
+                onClick={e => { e.stopPropagation(); setConfirmDeleteOpen(false); }}
+                className="px-4 py-2 rounded text-sm font-medium border border-border bg-background hover:bg-muted transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deleteLoading}
+                className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-60"
+              >
+                {deleteLoading
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Trash2  className="h-3.5 w-3.5" />
+                }
+                {deleteLoading ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* ── Botão Paciente Consultou (Pipeline 1: Agendado / Sinal Pago) ── */}
         {mostraBotaoConsultou && (

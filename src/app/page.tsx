@@ -127,6 +127,11 @@ export default function Home() {
     await fetchLeads();
   }
 
+  async function handleDeleteCard(lead: Lead) {
+    setLeads(prev => prev.filter(l => l.id !== lead.id));
+    await fetch(`/api/leads/${lead.id}`, { method: 'DELETE' });
+  }
+
   async function handlePacienteConsultou(lead: Lead) {
     // 1. Cria novo card no Pipeline 2 na etapa Compareceu
     await fetch('/api/leads', {
@@ -226,6 +231,7 @@ export default function Home() {
                   onMoveCard={handleMoveCard}
                   onCardClick={setSelectedLead}
                   onPacienteConsultou={handlePacienteConsultou}
+                  onDeleteCard={handleDeleteCard}
                 />
               </div>
             )}
@@ -246,6 +252,7 @@ export default function Home() {
                   leads={leadsP2}
                   onMoveCard={handleMoveCard}
                   onCardClick={setSelectedLead}
+                  onDeleteCard={handleDeleteCard}
                 />
               </div>
             )}
