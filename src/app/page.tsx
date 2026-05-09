@@ -127,6 +127,46 @@ export default function Home() {
     await fetchLeads();
   }
 
+  async function handlePacienteConsultou(lead: Lead) {
+    // 1. Cria novo card no Pipeline 2 (primeira etapa: Retorno Solicitado)
+    await fetch('/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome:         lead.nome,
+        telefone:     lead.telefone,
+        origem:       lead.origem,
+        procedimento: lead.procedimento,
+        prioridade:   lead.prioridade,
+        nota:         lead.nota,
+        tags:         lead.tags,
+        chatwoot_url: lead.chatwoot_url,
+        pipeline_id:  2,
+        etapa_atual:  'Retorno Solicitado',
+        movido_por:   'humano',
+      }),
+    });
+
+    // 2. Move o card original para "Perdido" no Pipeline 1
+    await handleMoveCard(lead.id, 'Perdido');
+
+    // 3. Dispara webhook N8N
+    fetch('https://n8n.drluizguedes.com.br/webhook/paciente-consultou', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_id:          lead.id,
+        nome:             lead.nome,
+        telefone:         lead.telefone,
+        pipeline_origem:  1,
+      }),
+    }).catch(() => {
+      // Falha no webhook não bloqueia o fluxo principal
+    });
+
+    await fetchLeads();
+  }
+
   function handleResolvePendencia(id: string) {
     setPendencias(prev => prev.filter(p => p.id !== id));
   }
@@ -185,6 +225,7 @@ export default function Home() {
                   leads={leadsP1}
                   onMoveCard={handleMoveCard}
                   onCardClick={setSelectedLead}
+                  onPacienteConsultou={handlePacienteConsultou}
                 />
               </div>
             )}

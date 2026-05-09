@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ExternalLink, Phone, Tag } from 'lucide-react';
+import { ExternalLink, Phone, Tag, Stethoscope, Loader2 } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import {
   calcSLAStatus, formatarTempoRelativo, formatarMoeda,
@@ -14,7 +14,10 @@ interface KanbanCardProps {
   lead: Lead;
   onClick: (lead: Lead) => void;
   isOverlay?: boolean;
+  onPacienteConsultou?: (lead: Lead) => Promise<void>;
 }
+
+const ETAPAS_COM_BOTAO_CONSULTOU = new Set(['Agendado', 'Sinal Pago']);
 
 const PRIORIDADE_LABEL: Record<string, string> = {
   urgente: 'URGENTE',
@@ -31,9 +34,28 @@ const PRIO_BADGE: Record<string, string> = {
   frio:    'bg-slate-100  text-slate-600  border border-slate-300  dark:bg-slate-800     dark:text-slate-400  dark:border-slate-600',
 };
 
-export function KanbanCard({ lead, onClick, isOverlay }: KanbanCardProps) {
+export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou }: KanbanCardProps) {
+  const [consultandoLoading, setConsultandoLoading] = useState(false);
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: lead.id });
+
+  const mostraBotaoConsultou =
+    !isOverlay &&
+    lead.pipeline_id === 1 &&
+    ETAPAS_COM_BOTAO_CONSULTOU.has(lead.etapa_atual) &&
+    !!onPacienteConsultou;
+
+  async function handleConsultou(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!onPacienteConsultou || consultandoLoading) return;
+    setConsultandoLoading(true);
+    try {
+      await onPacienteConsultou(lead);
+    } finally {
+      setConsultandoLoading(false);
+    }
+  }
 
   const slaStatus = calcSLAStatus(lead);
   const etapa     = getEtapa(lead.etapa_atual);
@@ -174,6 +196,26 @@ export function KanbanCard({ lead, onClick, isOverlay }: KanbanCardProps) {
             </button>
           )}
         </div>
+
+        {/* ── Botão Paciente Consultou (Pipeline 1: Agendado / Sinal Pago) ── */}
+        {mostraBotaoConsultou && (
+          <button
+            onClick={handleConsultou}
+            disabled={consultandoLoading}
+            className="mt-1.5 w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-[10px] font-bold transition-all duration-150 disabled:opacity-60"
+            style={{
+              backgroundColor: '#c2a650',
+              color: '#0b1a35',
+            }}
+          >
+            {consultandoLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Stethoscope className="h-3 w-3" />
+            )}
+            {consultandoLoading ? 'Processando...' : 'Paciente Consultou'}
+          </button>
+        )}
       </div>
     </div>
   );

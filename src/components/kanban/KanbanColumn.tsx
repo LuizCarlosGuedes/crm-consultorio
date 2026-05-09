@@ -11,9 +11,10 @@ interface KanbanColumnProps {
   stage: Stage;
   leads: Lead[];
   onCardClick: (lead: Lead) => void;
+  onPacienteConsultou?: (lead: Lead) => Promise<void>;
 }
 
-export function KanbanColumn({ stage, leads, onCardClick }: KanbanColumnProps) {
+export function KanbanColumn({ stage, leads, onCardClick, onPacienteConsultou }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
 
   const slaAtrasados = leads.filter(l => {
@@ -86,6 +87,7 @@ export function KanbanColumn({ stage, leads, onCardClick }: KanbanColumnProps) {
                 key={lead.id}
                 lead={lead}
                 onClick={onCardClick}
+                onPacienteConsultou={onPacienteConsultou}
               />
             ))}
             {leads.length === 0 && (
