@@ -66,6 +66,7 @@ export function ListView({ leads, onCardClick }: ListViewProps) {
             <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Origem</th>
             <Th col="prioridade">Prioridade</Th>
             <Th col="etapa_atual">Etapa</Th>
+            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Pipeline</th>
             <Th col="valor_consulta">Valor</Th>
             <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">SLA</th>
             <Th col="data_entrada">Entrada</Th>
@@ -111,6 +112,17 @@ export function ListView({ leads, onCardClick }: ListViewProps) {
                     </span>
                   )}
                 </td>
+                <td className="px-3 py-2.5">
+                  {(lead.pipeline_id ?? 1) === 1 ? (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 text-blue-500 border border-blue-500/30">
+                      P1
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                      P2
+                    </span>
+                  )}
+                </td>
                 <td className="px-3 py-2.5 text-xs font-semibold text-emerald-500">
                   {lead.valor_consulta > 0 ? formatarMoeda(lead.valor_consulta) : '—'}
                 </td>
@@ -141,7 +153,7 @@ export function ListView({ leads, onCardClick }: ListViewProps) {
           })}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={10} className="px-3 py-8 text-center text-sm text-muted-foreground">
+              <td colSpan={11} className="px-3 py-8 text-center text-sm text-muted-foreground">
                 Nenhum lead encontrado.
               </td>
             </tr>

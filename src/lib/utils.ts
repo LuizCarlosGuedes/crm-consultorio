@@ -124,3 +124,12 @@ export function getOrigemIcon(origem: string): string {
 export function formatarTag(tag: string): string {
   return tag.replace(/_/g, ' ');
 }
+
+export function diasNaEtapa(lead: Lead): number {
+  try {
+    const ms = Date.now() - new Date(lead.data_atualizacao).getTime();
+    return Math.max(0, Math.floor(ms / 86400000));
+  } catch {
+    return 0;
+  }
+}

@@ -41,6 +41,7 @@ export interface Lead {
   total_investido?: number;
   numero_consultas?: number;
   followup_tentativas?: number;
+  ultima_mensagem?: string | null;
 }
 
 export interface HistoricoMovimentacao {

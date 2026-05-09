@@ -7,6 +7,7 @@ import { PIPELINE_1, PIPELINE_2 } from '@/lib/constants';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { ListView } from '@/components/ListView';
 import { Dashboard } from '@/components/dashboard/Dashboard';
+import { RelatorioView } from '@/components/RelatorioView';
 import { LeadModal } from '@/components/LeadModal';
 import { AddLeadModal } from '@/components/AddLeadModal';
 import { PendenciasView } from '@/components/PendenciasView';
@@ -22,6 +23,7 @@ export default function Home() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm,   setSearchTerm]   = useState('');
   const [filterPrioridade, setFilterPrioridade] = useState('todos');
+  const [filterEtapa,      setFilterEtapa]      = useState('todas');
   const [showAll,  setShowAll]          = useState(false);
   const [pendencias, setPendencias]     = useState<Pendencia[]>([]);
   const [pendenciasLoading, setPendenciasLoading] = useState(false);
@@ -66,7 +68,12 @@ export default function Home() {
     };
   }, [fetchLeads, fetchPendencias]);
 
-  // Filtragem compartilhada entre os dois pipelines
+  // Reset filtro de etapa ao trocar de pipeline
+  function handleTabChange(tab: ActiveTab) {
+    setActiveTab(tab);
+    setFilterEtapa('todas');
+  }
+
   function filtrarLeads(allLeads: Lead[], pipelineId: 1 | 2): Lead[] {
     const doPipeline = allLeads.filter(l => {
       const pid = l.pipeline_id ?? 1;
@@ -82,7 +89,9 @@ export default function Home() {
         lead.telefone.includes(searchTerm);
       const matchesPrioridade =
         filterPrioridade === 'todos' || lead.prioridade === filterPrioridade;
-      return matchesSearch && matchesPrioridade;
+      const matchesEtapa =
+        filterEtapa === 'todas' || lead.etapa_atual === filterEtapa;
+      return matchesSearch && matchesPrioridade && matchesEtapa;
     });
   }
 
@@ -132,6 +141,18 @@ export default function Home() {
     await fetch(`/api/leads/${lead.id}`, { method: 'DELETE' });
   }
 
+  async function handleQuickNota(lead: Lead, nota: string) {
+    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, nota } : l));
+    await fetch(`/api/leads/${lead.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nota }),
+    });
+    if (selectedLead?.id === lead.id) {
+      setSelectedLead(prev => prev ? { ...prev, nota } : null);
+    }
+  }
+
   async function handlePacienteConsultou(lead: Lead) {
     // 1. Cria novo card no Pipeline 2 na etapa Compareceu
     await fetch('/api/leads', {
@@ -160,14 +181,12 @@ export default function Home() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        card_id:          lead.id,
-        nome:             lead.nome,
-        telefone:         lead.telefone,
-        pipeline_origem:  1,
+        card_id:         lead.id,
+        nome:            lead.nome,
+        telefone:        lead.telefone,
+        pipeline_origem: 1,
       }),
-    }).catch(() => {
-      // Falha no webhook não bloqueia o fluxo principal
-    });
+    }).catch(() => {});
 
     await fetchLeads();
   }
@@ -176,27 +195,29 @@ export default function Home() {
     setPendencias(prev => prev.filter(p => p.id !== id));
   }
 
-  const activePipeline  = activeTab === 'pipeline2' ? 2 : 1;
-  const activeStages    = activeTab === 'pipeline2' ? PIPELINE_2 : PIPELINE_1;
-  const leadsP1         = filtrarLeads(leads, 1);
-  const leadsP2         = filtrarLeads(leads, 2);
-  const filteredLeads   = activePipeline === 2 ? leadsP2 : leadsP1;
+  const activePipeline = activeTab === 'pipeline2' ? 2 : 1;
+  const activeStages   = activeTab === 'pipeline2' ? PIPELINE_2 : PIPELINE_1;
+  const leadsP1        = filtrarLeads(leads, 1);
+  const leadsP2        = filtrarLeads(leads, 2);
+  const filteredLeads  = activePipeline === 2 ? leadsP2 : leadsP1;
 
-  // Header height: with filter bar (pipeline tabs) = 101px, without = 53px
-  const showFilterBar   = activeTab === 'pipeline1' || activeTab === 'pipeline2';
-  const headerH         = showFilterBar ? 101 : 53;
+  const showFilterBar = activeTab === 'pipeline1' || activeTab === 'pipeline2';
+  const headerH       = showFilterBar ? 101 : 53;
 
   return (
     <div className="min-h-screen bg-background">
       <Header
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         filterPrioridade={filterPrioridade}
         onFilterChange={setFilterPrioridade}
+        filterEtapa={filterEtapa}
+        onFilterEtapaChange={setFilterEtapa}
+        stages={activeStages}
         showAll={showAll}
         onShowAllToggle={() => setShowAll(p => !p)}
         onAddLead={() => setShowAddModal(true)}
@@ -222,6 +243,13 @@ export default function Home() {
               </div>
             )}
 
+            {/* Relatório */}
+            {activeTab === 'relatorio' && (
+              <div className="overflow-y-auto" style={{ height: `calc(100vh - ${headerH}px)` }}>
+                <RelatorioView leads={leads} />
+              </div>
+            )}
+
             {/* Pipeline 1 — Captação */}
             {activeTab === 'pipeline1' && viewMode === 'kanban' && (
               <div className="overflow-hidden px-3 pt-3" style={{ height: `calc(100vh - ${headerH}px)` }}>
@@ -232,6 +260,7 @@ export default function Home() {
                   onCardClick={setSelectedLead}
                   onPacienteConsultou={handlePacienteConsultou}
                   onDeleteCard={handleDeleteCard}
+                  onQuickNota={handleQuickNota}
                 />
               </div>
             )}
@@ -253,6 +282,7 @@ export default function Home() {
                   onMoveCard={handleMoveCard}
                   onCardClick={setSelectedLead}
                   onDeleteCard={handleDeleteCard}
+                  onQuickNota={handleQuickNota}
                 />
               </div>
             )}

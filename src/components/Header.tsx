@@ -2,9 +2,9 @@
 
 import { Search, Plus, RefreshCw, Eye, LayoutGrid, List } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
-import { Input } from './ui/input';
+import { Stage } from '@/lib/types';
 
-export type ActiveTab = 'dashboard' | 'pipeline1' | 'pipeline2' | 'pendencias';
+export type ActiveTab = 'dashboard' | 'pipeline1' | 'pipeline2' | 'pendencias' | 'relatorio';
 export type ViewMode  = 'kanban' | 'lista';
 
 interface HeaderProps {
@@ -16,6 +16,9 @@ interface HeaderProps {
   onSearchChange: (val: string) => void;
   filterPrioridade: string;
   onFilterChange: (val: string) => void;
+  filterEtapa: string;
+  onFilterEtapaChange: (val: string) => void;
+  stages: Stage[];
   showAll: boolean;
   onShowAllToggle: () => void;
   onAddLead: () => void;
@@ -32,10 +35,11 @@ const FILTERS = [
 ];
 
 const TABS: { id: ActiveTab; label: string }[] = [
-  { id: 'dashboard',  label: 'Dashboard'   },
-  { id: 'pipeline1',  label: 'Pipeline 1'  },
-  { id: 'pipeline2',  label: 'Pipeline 2'  },
-  { id: 'pendencias', label: 'Pendências'  },
+  { id: 'dashboard',  label: 'Dashboard'  },
+  { id: 'pipeline1',  label: 'Pipeline 1' },
+  { id: 'pipeline2',  label: 'Pipeline 2' },
+  { id: 'pendencias', label: 'Pendências' },
+  { id: 'relatorio',  label: 'Relatório'  },
 ];
 
 export function Header({
@@ -43,6 +47,8 @@ export function Header({
   viewMode, onViewModeChange,
   searchTerm, onSearchChange,
   filterPrioridade, onFilterChange,
+  filterEtapa, onFilterEtapaChange,
+  stages,
   showAll, onShowAllToggle,
   onAddLead, onRefresh,
   pendenciasCount = 0,
@@ -180,7 +186,7 @@ export function Header({
           style={{ borderBottom: '1px solid #3f4e6870' }}
         >
           {/* Search */}
-          <div className="relative flex-shrink-0 w-52">
+          <div className="relative flex-shrink-0 w-48">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: '#e0e0e0' }} />
             <input
               type="text"
@@ -195,6 +201,29 @@ export function Header({
               onChange={e => onSearchChange(e.target.value)}
             />
           </div>
+
+          {/* Filtro por etapa */}
+          <select
+            value={filterEtapa}
+            onChange={e => onFilterEtapaChange(e.target.value)}
+            className="h-8 rounded-md text-xs outline-none flex-shrink-0 px-2 pr-6 appearance-none cursor-pointer"
+            style={{
+              backgroundColor: filterEtapa !== 'todas' ? '#c2a650' : '#3f4e6860',
+              border: '1px solid #3f4e68',
+              color: filterEtapa !== 'todas' ? '#0b1a35' : '#f7f6f4',
+              fontWeight: filterEtapa !== 'todas' ? 700 : 400,
+              minWidth: '140px',
+            }}
+          >
+            <option value="todas" style={{ backgroundColor: '#0b1a35', color: '#f7f6f4' }}>
+              Todas as etapas
+            </option>
+            {stages.map(s => (
+              <option key={s.id} value={s.id} style={{ backgroundColor: '#0b1a35', color: '#f7f6f4' }}>
+                {s.nome}
+              </option>
+            ))}
+          </select>
 
           {/* Priority filters */}
           <div className="flex items-center gap-1 flex-shrink-0">

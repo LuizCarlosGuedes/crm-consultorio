@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ExternalLink, Phone, Tag, Stethoscope, Loader2, Trash2 } from 'lucide-react';
+import { ExternalLink, Phone, Tag, Stethoscope, Loader2, Trash2, Pencil, Save } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import {
   Dialog, DialogContent, DialogHeader, DialogFooter,
@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   calcSLAStatus, formatarTempoRelativo, formatarMoeda,
-  getOrigemIcon, calcularIdade, formatarTag, getEtapa, cn,
+  getOrigemIcon, calcularIdade, formatarTag, getEtapa, diasNaEtapa, cn,
 } from '@/lib/utils';
 
 interface KanbanCardProps {
@@ -20,6 +20,7 @@ interface KanbanCardProps {
   isOverlay?: boolean;
   onPacienteConsultou?: (lead: Lead) => Promise<void>;
   onDeleteCard?: (lead: Lead) => Promise<void>;
+  onQuickNota?: (lead: Lead, nota: string) => Promise<void>;
 }
 
 const ETAPAS_COM_BOTAO_CONSULTOU = new Set(['Agendado', 'Sinal Pago']);
@@ -31,7 +32,6 @@ const PRIORIDADE_LABEL: Record<string, string> = {
   frio:    'Frio',
 };
 
-/* Cores dos badges de prioridade (light mode) */
 const PRIO_BADGE: Record<string, string> = {
   urgente: 'bg-red-100    text-red-700    border border-red-300    dark:bg-red-900/40    dark:text-red-400    dark:border-red-700',
   alta:    'bg-orange-100 text-orange-700 border border-orange-300 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-700',
@@ -39,10 +39,13 @@ const PRIO_BADGE: Record<string, string> = {
   frio:    'bg-slate-100  text-slate-600  border border-slate-300  dark:bg-slate-800     dark:text-slate-400  dark:border-slate-600',
 };
 
-export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onDeleteCard }: KanbanCardProps) {
+export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onDeleteCard, onQuickNota }: KanbanCardProps) {
   const [consultandoLoading, setConsultandoLoading] = useState(false);
-  const [confirmDeleteOpen, setConfirmDeleteOpen]   = useState(false);
-  const [deleteLoading,      setDeleteLoading]       = useState(false);
+  const [confirmDeleteOpen,  setConfirmDeleteOpen]  = useState(false);
+  const [deleteLoading,      setDeleteLoading]      = useState(false);
+  const [notaOpen,           setNotaOpen]           = useState(false);
+  const [notaText,           setNotaText]           = useState('');
+  const [notaSaving,         setNotaSaving]         = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: lead.id });
@@ -52,6 +55,27 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onDe
     lead.pipeline_id === 1 &&
     ETAPAS_COM_BOTAO_CONSULTOU.has(lead.etapa_atual) &&
     !!onPacienteConsultou;
+
+  const slaStatus = calcSLAStatus(lead);
+  const etapa     = getEtapa(lead.etapa_atual);
+  const idade     = calcularIdade(lead.data_nascimento);
+  const dias      = diasNaEtapa(lead);
+
+  const style = {
+    transform:  CSS.Transform.toString(transform),
+    transition,
+    borderLeft: `4px solid ${etapa?.corHex ?? '#3f4e68'}`,
+  };
+
+  const infoDataPessoal = [
+    idade !== null ? `${idade} anos` : null,
+    lead.sexo
+      ? (lead.sexo === 'M' ? 'Masc.' : lead.sexo === 'F' ? 'Fem.' : lead.sexo)
+      : null,
+    lead.estado_civil ?? null,
+  ].filter(Boolean).join(' · ');
+
+  const tagsMostrar = (lead.tags ?? []).slice(0, 3);
 
   function handleTrashClick(e: React.MouseEvent) {
     e.stopPropagation();
@@ -70,6 +94,24 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onDe
     }
   }
 
+  function handlePencilClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    setNotaText(lead.nota ?? '');
+    setNotaOpen(true);
+  }
+
+  async function handleSaveNota(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!onQuickNota || notaSaving) return;
+    setNotaSaving(true);
+    try {
+      await onQuickNota(lead, notaText);
+      setNotaOpen(false);
+    } finally {
+      setNotaSaving(false);
+    }
+  }
+
   async function handleConsultou(e: React.MouseEvent) {
     e.stopPropagation();
     if (!onPacienteConsultou || consultandoLoading) return;
@@ -80,26 +122,6 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onDe
       setConsultandoLoading(false);
     }
   }
-
-  const slaStatus = calcSLAStatus(lead);
-  const etapa     = getEtapa(lead.etapa_atual);
-  const idade     = calcularIdade(lead.data_nascimento);
-
-  const style = {
-    transform:  CSS.Transform.toString(transform),
-    transition,
-    borderLeft: `4px solid ${etapa?.corHex ?? '#3f4e68'}`,
-  };
-
-  const infoDataPessoal = [
-    idade !== null ? `${idade} anos` : null,
-    lead.sexo
-      ? (lead.sexo === 'M' ? 'Masc.' : lead.sexo === 'F' ? 'Fem.' : lead.sexo)
-      : null,
-    lead.estado_civil ?? null,
-  ].filter(Boolean).join(' · ');
-
-  const tagsMostrar = (lead.tags ?? []).slice(0, 3);
 
   return (
     <div
@@ -128,6 +150,7 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onDe
           <Trash2 className="h-3 w-3" />
         </button>
       )}
+
       <div className="px-3 pt-2.5 pb-2 space-y-1.5">
 
         {/* ── Header: origem + nome + prioridade ───────── */}
@@ -194,14 +217,56 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onDe
           </p>
         )}
 
-        {/* ── Nota / última mensagem ───────────────────── */}
-        {lead.nota && (
+        {/* ── Nota ─────────────────────────────────────── */}
+        {lead.nota && !notaOpen && (
           <p className="text-[10px] italic line-clamp-2 text-muted-foreground bg-brand-cream/60 dark:bg-brand-slate/10 border border-brand-gray/30 rounded px-1.5 py-1">
             💬 {lead.nota}
           </p>
         )}
 
-        {/* ── Footer: tempo + SLA + chatwoot ───────────── */}
+        {/* ── Última mensagem ──────────────────────────── */}
+        {lead.ultima_mensagem && !notaOpen && (
+          <p className="text-[10px] line-clamp-1 text-muted-foreground bg-blue-50/60 dark:bg-blue-900/10 border border-blue-200/40 dark:border-blue-700/30 rounded px-1.5 py-1">
+            📱 {lead.ultima_mensagem}
+          </p>
+        )}
+
+        {/* ── Editor de nota rápida ─────────────────────── */}
+        {notaOpen && (
+          <div
+            className="space-y-1"
+            onPointerDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+          >
+            <textarea
+              value={notaText}
+              onChange={e => setNotaText(e.target.value)}
+              rows={3}
+              autoFocus
+              placeholder="Escreva uma nota..."
+              className="w-full text-[10px] rounded px-1.5 py-1 border border-brand-gray/40 bg-background resize-none outline-none focus:border-brand-gold/60 dark:bg-card"
+            />
+            <div className="flex gap-1 justify-end">
+              <button
+                onClick={e => { e.stopPropagation(); setNotaOpen(false); }}
+                className="px-1.5 py-0.5 rounded text-[9px] text-muted-foreground hover:text-foreground border border-border bg-background"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveNota}
+                disabled={notaSaving}
+                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold disabled:opacity-60"
+                style={{ backgroundColor: '#c2a650', color: '#0b1a35' }}
+              >
+                {notaSaving ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Save className="h-2.5 w-2.5" />}
+                Salvar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Footer: tempo + dias + SLA + ações ───────── */}
         <div className="flex items-center justify-between pt-1 border-t border-brand-gray/40 dark:border-[#3f4e68]/40">
           <div className="flex items-center gap-1.5">
             <div className={cn('w-2 h-2 rounded-full flex-shrink-0', {
@@ -218,17 +283,34 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onDe
             {slaStatus === 'atencao' && (
               <span className="text-[9px] font-bold text-yellow-500">⚠️</span>
             )}
+            {/* Dias na etapa atual */}
+            <span className="text-[9px] text-muted-foreground/60">
+              {dias === 0 ? 'hoje' : `há ${dias}d`}
+            </span>
           </div>
 
-          {lead.chatwoot_url && (
-            <button
-              onClick={e => { e.stopPropagation(); window.open(lead.chatwoot_url, '_blank'); }}
-              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors bg-brand-gold/10 hover:bg-brand-gold/25 text-brand-gold"
-            >
-              <ExternalLink className="h-2.5 w-2.5" />
-              Chat
-            </button>
-          )}
+          <div className="flex items-center gap-0.5">
+            {/* Pencil: nota rápida */}
+            {!isOverlay && onQuickNota && (
+              <button
+                onClick={handlePencilClick}
+                title="Nota rápida"
+                className="flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] transition-colors opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              >
+                <Pencil className="h-2.5 w-2.5" />
+              </button>
+            )}
+
+            {lead.chatwoot_url && (
+              <button
+                onClick={e => { e.stopPropagation(); window.open(lead.chatwoot_url, '_blank'); }}
+                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors bg-brand-gold/10 hover:bg-brand-gold/25 text-brand-gold"
+              >
+                <ExternalLink className="h-2.5 w-2.5" />
+                Chat
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── Modal de confirmação de exclusão ─────────── */}
@@ -268,10 +350,7 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onDe
             onClick={handleConsultou}
             disabled={consultandoLoading}
             className="mt-1.5 w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-[10px] font-bold transition-all duration-150 disabled:opacity-60"
-            style={{
-              backgroundColor: '#c2a650',
-              color: '#0b1a35',
-            }}
+            style={{ backgroundColor: '#c2a650', color: '#0b1a35' }}
           >
             {consultandoLoading ? (
               <Loader2 className="h-3 w-3 animate-spin" />

@@ -21,9 +21,10 @@ interface KanbanBoardProps {
   onCardClick: (lead: Lead) => void;
   onPacienteConsultou?: (lead: Lead) => Promise<void>;
   onDeleteCard?: (lead: Lead) => Promise<void>;
+  onQuickNota?: (lead: Lead, nota: string) => Promise<void>;
 }
 
-export function KanbanBoard({ stages, leads, onMoveCard, onCardClick, onPacienteConsultou, onDeleteCard }: KanbanBoardProps) {
+export function KanbanBoard({ stages, leads, onMoveCard, onCardClick, onPacienteConsultou, onDeleteCard, onQuickNota }: KanbanBoardProps) {
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
 
   const sensors = useSensors(
@@ -75,6 +76,7 @@ export function KanbanBoard({ stages, leads, onMoveCard, onCardClick, onPaciente
             onCardClick={onCardClick}
             onPacienteConsultou={onPacienteConsultou}
             onDeleteCard={onDeleteCard}
+            onQuickNota={onQuickNota}
           />
         ))}
       </div>

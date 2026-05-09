@@ -531,8 +531,10 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard }: LeadModalProp
                           </>
                         )}
                         <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">{h.etapa_destino}</span>
-                        {h.movido_por === 'n8n' && (
-                          <span className="text-[9px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1 py-0.5 rounded font-bold">N8N</span>
+                        {h.movido_por === 'n8n' ? (
+                          <span className="text-[9px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1 py-0.5 rounded font-bold">Nathalia IA</span>
+                        ) : (
+                          <span className="text-[9px] bg-brand-gold/10 border border-brand-gold/30 px-1 py-0.5 rounded font-bold" style={{ color: '#c2a650' }}>Dr. Luiz</span>
                         )}
                       </div>
                       {h.motivo && <p className="text-xs text-muted-foreground mt-0.5">{h.motivo}</p>}
