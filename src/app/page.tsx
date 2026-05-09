@@ -128,7 +128,7 @@ export default function Home() {
   }
 
   async function handlePacienteConsultou(lead: Lead) {
-    // 1. Cria novo card no Pipeline 2 (primeira etapa: Retorno Solicitado)
+    // 1. Cria novo card no Pipeline 2 na etapa Compareceu
     await fetch('/api/leads', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

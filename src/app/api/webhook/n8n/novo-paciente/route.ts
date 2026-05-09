@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'nome e telefone são obrigatórios' }, { status: 400 });
   }
 
-  const slaVencimento = calcSLAVencimento('Retorno Solicitado');
+  const slaVencimento = calcSLAVencimento('Compareceu');
 
   const { data, error } = await supabase
     .from('leads')
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       nota:           String(nota         ?? ''),
       valor_consulta: 0,
       chatwoot_url:   String(chatwoot_url ?? ''),
-      etapa_atual:    'Retorno Solicitado',
+      etapa_atual:    'Compareceu',
       pipeline_id:    2,
       movido_por_ia:  true,
       sla_vencimento: slaVencimento.toISOString(),
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
   await supabase.from('historico_movimentacoes').insert({
     lead_id:       data.id,
     etapa_origem:  null,
-    etapa_destino: 'Retorno Solicitado',
+    etapa_destino: 'Compareceu',
     motivo:        'Paciente adicionado ao Pipeline 2 via N8N',
     movido_por:    'n8n',
   });

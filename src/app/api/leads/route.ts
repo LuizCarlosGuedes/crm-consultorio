@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   const pid = Number(pipeline_id ?? 1);
-  const etapaInicial = pid === 2 ? 'Retorno Solicitado' : 'Novo Lead';
+  const etapaInicial = pid === 2 ? 'Compareceu' : 'Novo Lead';
   const slaVencimento = calcSLAVencimento(etapaInicial);
 
   const { data, error } = await supabase

@@ -16,11 +16,11 @@ export const PIPELINE_1: Stage[] = [
 ];
 
 export const PIPELINE_2: Stage[] = [
-  { id: 'Retorno Solicitado', nome: 'Retorno Solicitado', cor: 'text-blue-500',   corBg: 'bg-blue-500/15',   corBorda: 'border-blue-500/60',   corHex: '#3B82F6', slaMinutos: 120,   slaLabel: '2h',           pipeline: 2 },
-  { id: 'Agendado P2',        nome: 'Agendado',           cor: 'text-orange-500', corBg: 'bg-orange-500/15', corBorda: 'border-orange-500/60', corHex: '#F97316', slaMinutos: 10080, slaLabel: 'Até consulta', pipeline: 2 },
-  { id: 'Compareceu',         nome: 'Compareceu',         cor: 'text-cyan-600',   corBg: 'bg-cyan-500/15',   corBorda: 'border-cyan-500/60',   corHex: '#06B6D4', slaMinutos: 1440,  slaLabel: '1 dia',        pipeline: 2 },
-  { id: 'Pós Consulta',       nome: 'Pós Consulta',       cor: 'text-teal-600',   corBg: 'bg-teal-500/15',   corBorda: 'border-teal-500/60',   corHex: '#14B8A6', slaMinutos: 10080, slaLabel: '7 dias',       pipeline: 2 },
-  { id: 'Recorrente',         nome: 'Recorrente',         cor: 'text-lime-600',   corBg: 'bg-lime-500/15',   corBorda: 'border-lime-500/60',   corHex: '#84CC16', slaMinutos: 43200, slaLabel: 'Mensal',       pipeline: 2 },
+  { id: 'Compareceu',              nome: 'Compareceu',              cor: 'text-cyan-600',   corBg: 'bg-cyan-500/15',   corBorda: 'border-cyan-500/60',   corHex: '#06B6D4', slaMinutos: 1440,  slaLabel: '1 dia',        pipeline: 2 },
+  { id: 'Pós Consulta',            nome: 'Pós Consulta',            cor: 'text-teal-600',   corBg: 'bg-teal-500/15',   corBorda: 'border-teal-500/60',   corHex: '#14B8A6', slaMinutos: 10080, slaLabel: '7 dias',       pipeline: 2 },
+  { id: 'Agendamento de Retorno',  nome: 'Agend. Retorno',          cor: 'text-violet-500', corBg: 'bg-violet-500/15', corBorda: 'border-violet-500/60', corHex: '#8B5CF6', slaMinutos: 120,   slaLabel: '2h',           pipeline: 2 },
+  { id: 'Retorno Agendado',        nome: 'Retorno Agendado',        cor: 'text-orange-500', corBg: 'bg-orange-500/15', corBorda: 'border-orange-500/60', corHex: '#F97316', slaMinutos: 10080, slaLabel: 'Até consulta', pipeline: 2 },
+  { id: 'Recorrente',              nome: 'Recorrente',              cor: 'text-lime-600',   corBg: 'bg-lime-500/15',   corBorda: 'border-lime-500/60',   corHex: '#84CC16', slaMinutos: 43200, slaLabel: 'Mensal',       pipeline: 2 },
 ];
 
 export const TODAS_ETAPAS: Stage[] = [...PIPELINE_1, ...PIPELINE_2];
