@@ -72,6 +72,7 @@ export interface Stage {
   slaMinutos: number;
   slaLabel: string;
   pipeline: 1 | 2;
+  descricao?: string;
 }
 
 export interface Pendencia {

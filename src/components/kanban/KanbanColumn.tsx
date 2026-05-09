@@ -5,6 +5,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Stage, Lead } from '@/lib/types';
 import { KanbanCard } from './KanbanCard';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { cn } from '@/lib/utils';
 
 interface KanbanColumnProps {
@@ -25,8 +26,8 @@ export function KanbanColumn({ stage, leads, onCardClick, onPacienteConsultou, o
   }).length;
 
   return (
-    <div className="flex flex-col flex-shrink-0 w-[260px]">
-      {/* ── Column header — marinho + borda superior colorida ── */}
+    <div className="flex flex-col flex-shrink-0 w-[280px]">
+      {/* ── Column header ─────────────────────────────── */}
       <div
         className="flex items-center justify-between px-3 py-2 rounded-t-lg"
         style={{
@@ -36,8 +37,8 @@ export function KanbanColumn({ stage, leads, onCardClick, onPacienteConsultou, o
           borderRight: `1px solid ${stage.corHex}55`,
         }}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          {/* Stage name in cream */}
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          {/* Stage name */}
           <span
             className="font-bold text-[11px] truncate tracking-wide uppercase"
             style={{ color: '#f7f6f4' }}
@@ -45,7 +46,7 @@ export function KanbanColumn({ stage, leads, onCardClick, onPacienteConsultou, o
             {stage.nome}
           </span>
 
-          {/* Count badge — dourado */}
+          {/* Count badge */}
           <span
             className="text-[10px] font-black rounded-full px-1.5 py-0.5 flex-shrink-0 leading-none"
             style={{ backgroundColor: '#c2a650', color: '#0b1a35' }}
@@ -53,9 +54,14 @@ export function KanbanColumn({ stage, leads, onCardClick, onPacienteConsultou, o
             {leads.length}
           </span>
 
+          {/* Help tooltip */}
+          {stage.descricao && (
+            <InfoTooltip text={stage.descricao} side="bottom" />
+          )}
+
           {/* SLA alerts badge */}
           {slaAtrasados > 0 && (
-            <span className="text-[9px] font-bold text-red-400 animate-sla-pulse">
+            <span className="text-[9px] font-bold text-red-400 animate-sla-pulse flex-shrink-0">
               ⚠️{slaAtrasados}
             </span>
           )}
@@ -67,7 +73,7 @@ export function KanbanColumn({ stage, leads, onCardClick, onPacienteConsultou, o
         </span>
       </div>
 
-      {/* ── Cards area ─────────────────────────────────────── */}
+      {/* ── Cards area ─────────────────────────────────── */}
       <div
         ref={setNodeRef}
         className={cn(

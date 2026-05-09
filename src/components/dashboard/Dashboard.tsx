@@ -11,25 +11,38 @@ import { Users, Activity, TrendingUp, DollarSign, Repeat2, AlertTriangle, HeartP
 import { Lead } from '@/lib/types';
 import { TODAS_ETAPAS } from '@/lib/constants';
 import { calcSLAStatus, formatarMoeda, cn } from '@/lib/utils';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
 interface DashboardProps {
   leads: Lead[];
 }
 
-function MetricCard({ icon: Icon, label, value, sub, color }: {
-  icon: React.ElementType; label: string; value: string; sub?: string; color: string;
+function MetricCard({ icon: Icon, label, value, sub, color, help }: {
+  icon: React.ElementType; label: string; value: string; sub?: string; color: string; help?: string;
 }) {
   return (
     <div className="bg-card border border-border rounded-lg p-4 flex items-start gap-3">
       <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', color)}>
         <Icon className="h-4 w-4 text-white" />
       </div>
-      <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          {help && <InfoTooltip text={help} side="right" />}
+        </div>
         <p className="text-xl font-bold mt-0.5">{value}</p>
         {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
       </div>
     </div>
+  );
+}
+
+function SectionTitle({ children, help }: { children: React.ReactNode; help?: string }) {
+  return (
+    <h3 className="text-sm font-semibold mb-4 flex items-center gap-1.5">
+      {children}
+      {help && <InfoTooltip text={help} side="right" />}
+    </h3>
   );
 }
 
@@ -72,7 +85,6 @@ export function Dashboard({ leads }: DashboardProps) {
     };
   }, [leads]);
 
-  // Leads por semana (últimas 8 semanas)
   const leadsPorSemana = useMemo(() => {
     return Array.from({ length: 8 }, (_, i) => {
       const weekStart = startOfWeek(subWeeks(now, 7 - i), { locale: ptBR });
@@ -81,14 +93,10 @@ export function Dashboard({ leads }: DashboardProps) {
         const d = new Date(l.data_entrada);
         return isAfter(d, weekStart) && isBefore(d, weekEnd);
       }).length;
-      return {
-        semana: format(weekStart, "'S'w", { locale: ptBR }),
-        leads: count,
-      };
+      return { semana: format(weekStart, "'S'w", { locale: ptBR }), leads: count };
     });
   }, [leads]);
 
-  // Faturamento por mês (últimos 6 meses)
   const faturamentoPorMes = useMemo(() => {
     return Array.from({ length: 6 }, (_, i) => {
       const monthStart = startOfMonth(subMonths(now, 5 - i));
@@ -100,14 +108,10 @@ export function Dashboard({ leads }: DashboardProps) {
             ['Pago / Confirmado', 'Compareceu', 'Recorrente'].includes(l.etapa_atual);
         })
         .reduce((s, l) => s + (l.valor_consulta || 0), 0);
-      return {
-        mes: format(monthStart, 'MMM', { locale: ptBR }),
-        valor,
-      };
+      return { mes: format(monthStart, 'MMM', { locale: ptBR }), valor };
     });
   }, [leads]);
 
-  // Procedimentos mais agendados (top 6)
   const procedimentos = useMemo(() => {
     const counts: Record<string, number> = {};
     leads.forEach(l => {
@@ -119,7 +123,6 @@ export function Dashboard({ leads }: DashboardProps) {
       .map(([nome, count]) => ({ nome: nome.length > 20 ? nome.slice(0, 18) + '…' : nome, count }));
   }, [leads]);
 
-  // Origem dos leads
   const origens = useMemo(() => {
     const counts: Record<string, number> = {};
     leads.forEach(l => { counts[l.origem] = (counts[l.origem] || 0) + 1; });
@@ -127,13 +130,11 @@ export function Dashboard({ leads }: DashboardProps) {
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .map(([origem, count]) => ({
-        origem,
-        count,
+        origem, count,
         pct: total > 0 ? Math.round((count / total) * 100) : 0,
       }));
   }, [leads]);
 
-  // Distribuição por etapa
   const distribuicaoPorEtapa = useMemo(() => {
     return TODAS_ETAPAS.map(e => ({
       etapa: e,
@@ -152,19 +153,47 @@ export function Dashboard({ leads }: DashboardProps) {
     <div className="space-y-6 pb-8">
       {/* Metrics row */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <MetricCard icon={Users}     label="Total de Leads"     value={String(metrics.total)}    color="bg-blue-500" />
-        <MetricCard icon={Activity}  label="Leads Ativos"       value={String(metrics.ativos)}   color="bg-violet-500" sub={`${metrics.total - metrics.ativos} perdidos`} />
-        <MetricCard icon={HeartPulse} label="Consultas Realizadas" value={String(metrics.compareceram)} sub={`${metrics.taxaConversao.toFixed(1)}% conversão`} color="bg-cyan-500" />
-        <MetricCard icon={DollarSign} label="Receita Confirmada"  value={formatarMoeda(metrics.receitaConfirmada)} color="bg-emerald-500" />
-        <MetricCard icon={TrendingUp} label="Ticket Médio"        value={formatarMoeda(metrics.ticketMedio)} color="bg-amber-500" />
-        <MetricCard icon={Repeat2}    label="Taxa de Retorno"     value={`${metrics.taxaRetorno.toFixed(1)}%`} sub={`${metrics.recorrentes} recorrentes`} color="bg-rose-500" />
+        <MetricCard
+          icon={Users}     label="Total de Leads"       value={String(metrics.total)}
+          color="bg-blue-500"
+          help="Número total de leads cadastrados no sistema em ambos os pipelines."
+        />
+        <MetricCard
+          icon={Activity}  label="Leads Ativos"         value={String(metrics.ativos)}
+          sub={`${metrics.total - metrics.ativos} perdidos`}
+          color="bg-violet-500"
+          help="Leads que estão ativamente sendo trabalhados — excluindo Perdidos e Nutrição."
+        />
+        <MetricCard
+          icon={HeartPulse} label="Consultas Realizadas" value={String(metrics.compareceram)}
+          sub={`${metrics.taxaConversao.toFixed(1)}% conversão`}
+          color="bg-cyan-500"
+          help="Total de consultas confirmadas e realizadas com o Dr. Luiz."
+        />
+        <MetricCard
+          icon={DollarSign} label="Receita Confirmada"   value={formatarMoeda(metrics.receitaConfirmada)}
+          color="bg-emerald-500"
+          help="Soma total dos valores de consultas com pagamento confirmado."
+        />
+        <MetricCard
+          icon={TrendingUp} label="Ticket Médio"         value={formatarMoeda(metrics.ticketMedio)}
+          color="bg-amber-500"
+          help="Valor médio por consulta realizada."
+        />
+        <MetricCard
+          icon={Repeat2}    label="Taxa de Retorno"      value={`${metrics.taxaRetorno.toFixed(1)}%`}
+          sub={`${metrics.recorrentes} recorrentes`}
+          color="bg-rose-500"
+          help="Percentual de pacientes que agendaram retorno após a primeira consulta."
+        />
       </div>
 
       {/* Charts row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Leads por semana */}
         <div className="bg-card border border-border rounded-lg p-4">
-          <h3 className="text-sm font-semibold mb-4">Novos Leads por Semana (últimas 8 semanas)</h3>
+          <SectionTitle help="Quantidade de novos leads captados via WhatsApp nas últimas 8 semanas.">
+            Novos Leads por Semana (últimas 8 semanas)
+          </SectionTitle>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={leadsPorSemana}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -176,9 +205,10 @@ export function Dashboard({ leads }: DashboardProps) {
           </ResponsiveContainer>
         </div>
 
-        {/* Faturamento por mês */}
         <div className="bg-card border border-border rounded-lg p-4">
-          <h3 className="text-sm font-semibold mb-4">Faturamento por Mês (últimos 6 meses)</h3>
+          <SectionTitle help="Receita total confirmada mês a mês nos últimos 6 meses.">
+            Faturamento por Mês (últimos 6 meses)
+          </SectionTitle>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={faturamentoPorMes}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -193,9 +223,10 @@ export function Dashboard({ leads }: DashboardProps) {
 
       {/* Charts row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Procedimentos */}
         <div className="bg-card border border-border rounded-lg p-4">
-          <h3 className="text-sm font-semibold mb-4">Procedimentos Mais Agendados (Top 6)</h3>
+          <SectionTitle help="Top 6 procedimentos ou condições mais buscadas pelos leads.">
+            Procedimentos Mais Agendados (Top 6)
+          </SectionTitle>
           {procedimentos.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">Sem dados</p>
           ) : (
@@ -215,9 +246,10 @@ export function Dashboard({ leads }: DashboardProps) {
           )}
         </div>
 
-        {/* Origem dos leads */}
         <div className="bg-card border border-border rounded-lg p-4">
-          <h3 className="text-sm font-semibold mb-4">Origem dos Leads</h3>
+          <SectionTitle help="De onde vieram os leads — WhatsApp, indicação, Instagram, etc.">
+            Origem dos Leads
+          </SectionTitle>
           {origens.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">Sem dados</p>
           ) : (
@@ -248,7 +280,10 @@ export function Dashboard({ leads }: DashboardProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Distribuição por etapa */}
         <div className="bg-card border border-border rounded-lg p-4">
-          <h3 className="text-sm font-semibold mb-3">Distribuição por Etapa</h3>
+          <h3 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
+            Distribuição por Etapa
+            <InfoTooltip text="Quantidade de leads em cada etapa do funil de captação." side="right" />
+          </h3>
           <div className="space-y-1.5 max-h-80 overflow-y-auto">
             {TODAS_ETAPAS.map(e => {
               const count = leads.filter(l => l.etapa_atual === e.id).length;
@@ -271,6 +306,7 @@ export function Dashboard({ leads }: DashboardProps) {
           <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-red-500" />
             Alertas de SLA ({metrics.slaAtrasados.length})
+            <InfoTooltip text="Leads que ultrapassaram o tempo limite em uma etapa sem movimentação." side="right" />
           </h3>
           {metrics.slaAtrasados.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-4">Nenhum SLA vencido!</p>
@@ -295,15 +331,16 @@ export function Dashboard({ leads }: DashboardProps) {
           <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
             <HeartPulse className="h-4 w-4 text-emerald-500" />
             Saúde do Funil
+            <InfoTooltip text="Indicadores gerais de performance do funil — conversão, no-show, fidelização." side="right" />
           </h3>
           <div className="space-y-3">
             {[
-              { label: 'Taxa de Conversão',    value: `${metrics.taxaConversao.toFixed(1)}%`,  ok: metrics.taxaConversao > 20,    color: 'text-emerald-500' },
-              { label: 'Taxa de Retorno',       value: `${metrics.taxaRetorno.toFixed(1)}%`,   ok: metrics.taxaRetorno > 30,     color: 'text-cyan-500' },
-              { label: 'Taxa de No-Show',       value: `${metrics.taxaNoShow.toFixed(1)}%`,    ok: metrics.taxaNoShow < 15,      color: 'text-orange-500' },
-              { label: 'Fidelizados',           value: `${metrics.recorrentes}`,                ok: metrics.recorrentes > 0,      color: 'text-lime-500' },
-              { label: 'SLAs Críticos',         value: `${metrics.slaAtrasados.length}`,        ok: metrics.slaAtrasados.length === 0, color: 'text-red-500' },
-              { label: 'Leads Ativos',          value: `${metrics.ativos}`,                    ok: metrics.ativos > 0,           color: 'text-blue-500' },
+              { label: 'Taxa de Conversão', value: `${metrics.taxaConversao.toFixed(1)}%`,  ok: metrics.taxaConversao > 20,       color: 'text-emerald-500' },
+              { label: 'Taxa de Retorno',   value: `${metrics.taxaRetorno.toFixed(1)}%`,    ok: metrics.taxaRetorno > 30,         color: 'text-cyan-500'    },
+              { label: 'Taxa de No-Show',   value: `${metrics.taxaNoShow.toFixed(1)}%`,     ok: metrics.taxaNoShow < 15,          color: 'text-orange-500'  },
+              { label: 'Fidelizados',       value: `${metrics.recorrentes}`,                ok: metrics.recorrentes > 0,          color: 'text-lime-500'    },
+              { label: 'SLAs Críticos',     value: `${metrics.slaAtrasados.length}`,        ok: metrics.slaAtrasados.length === 0, color: 'text-red-500'    },
+              { label: 'Leads Ativos',      value: `${metrics.ativos}`,                     ok: metrics.ativos > 0,               color: 'text-blue-500'   },
             ].map(item => (
               <div key={item.label} className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">{item.label}</span>
