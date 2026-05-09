@@ -142,13 +142,13 @@ export default function Home() {
         tags:         lead.tags,
         chatwoot_url: lead.chatwoot_url,
         pipeline_id:  2,
-        etapa_atual:  'Retorno Solicitado',
+        etapa_atual:  'Compareceu',
         movido_por:   'humano',
       }),
     });
 
-    // 2. Move o card original para "Perdido" no Pipeline 1
-    await handleMoveCard(lead.id, 'Perdido');
+    // 2. Remove o card original do Pipeline 1
+    await fetch(`/api/leads/${lead.id}`, { method: 'DELETE' });
 
     // 3. Dispara webhook N8N
     fetch('https://n8n.drluizguedes.com.br/webhook/paciente-consultou', {
