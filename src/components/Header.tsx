@@ -4,7 +4,7 @@ import { Search, Plus, RefreshCw, Eye, LayoutGrid, List } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { Stage } from '@/lib/types';
 
-export type ActiveTab = 'dashboard' | 'pipeline1' | 'pipeline2' | 'pendencias' | 'relatorio';
+export type ActiveTab = 'dashboard' | 'pipeline1' | 'pipeline2' | 'pendencias';
 export type ViewMode  = 'kanban' | 'lista';
 
 interface HeaderProps {
@@ -39,7 +39,6 @@ const TABS: { id: ActiveTab; label: string }[] = [
   { id: 'pipeline1',  label: 'Pipeline 1' },
   { id: 'pipeline2',  label: 'Pipeline 2' },
   { id: 'pendencias', label: 'Pendências' },
-  { id: 'relatorio',  label: 'Relatório'  },
 ];
 
 export function Header({

@@ -7,7 +7,6 @@ import { PIPELINE_1, PIPELINE_2 } from '@/lib/constants';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { ListView } from '@/components/ListView';
 import { Dashboard } from '@/components/dashboard/Dashboard';
-import { RelatorioView } from '@/components/RelatorioView';
 import { LeadModal } from '@/components/LeadModal';
 import { AddLeadModal } from '@/components/AddLeadModal';
 import { PendenciasView } from '@/components/PendenciasView';
@@ -240,13 +239,6 @@ export default function Home() {
             {activeTab === 'dashboard' && (
               <div className="p-4">
                 <Dashboard leads={leads} />
-              </div>
-            )}
-
-            {/* Relatório */}
-            {activeTab === 'relatorio' && (
-              <div className="overflow-y-auto" style={{ height: `calc(100vh - ${headerH}px)` }}>
-                <RelatorioView leads={leads} />
               </div>
             )}
 
