@@ -7,10 +7,26 @@ function autenticar(req: NextRequest): boolean {
   return token === (process.env.WEBHOOK_SECRET_TOKEN ?? '');
 }
 
-const CAMPOS_PERMITIDOS = [
+// Campos diretos aceitos (nome no body = nome na coluna)
+const CAMPOS_PERMITIDOS = new Set([
+  // Básicos
   'nome', 'telefone', 'origem', 'procedimento', 'prioridade',
   'valor_consulta', 'nota', 'chatwoot_url',
-];
+  // Dados pessoais
+  'email', 'data_nascimento', 'sexo', 'estado_civil', 'cpf', 'rg',
+  // Endereço
+  'endereco', 'numero', 'complemento', 'bairro', 'cep', 'cidade', 'estado',
+  // Perfil clínico
+  'profissao', 'foi_indicacao', 'como_conheceu',
+  'total_investido', 'numero_consultas', 'followup_tentativas',
+  // Automação
+  'ultima_mensagem',
+]);
+
+// Campos que chegam com nome diferente do banco
+const ALIAS: Record<string, string> = {
+  genero: 'sexo',
+};
 
 export async function POST(req: NextRequest) {
   if (!autenticar(req)) {
@@ -32,14 +48,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'card_id é obrigatório' }, { status: 400 });
   }
 
-  // Filter only allowed fields
   const updateData: Record<string, unknown> = {};
-  for (const campo of CAMPOS_PERMITIDOS) {
-    if (campo in campos) updateData[campo] = campos[campo];
+
+  for (const [key, value] of Object.entries(campos)) {
+    const coluna = ALIAS[key] ?? key;
+    if (CAMPOS_PERMITIDOS.has(coluna)) {
+      updateData[coluna] = value;
+    }
   }
 
   if (Object.keys(updateData).length === 0) {
-    return NextResponse.json({ error: 'Nenhum campo válido para atualizar. Campos permitidos: ' + CAMPOS_PERMITIDOS.join(', ') }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Nenhum campo válido para atualizar.', campos_aceitos: Array.from(CAMPOS_PERMITIDOS).concat(Object.keys(ALIAS)) },
+      { status: 400 }
+    );
   }
 
   const { data, error } = await supabase

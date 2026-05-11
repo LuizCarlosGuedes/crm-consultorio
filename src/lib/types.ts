@@ -20,6 +20,7 @@ export interface Lead {
   data_atualizacao: string;
   sla_vencimento: string | null;
   // Dados pessoais
+  email?: string | null;
   data_nascimento?: string | null;
   sexo?: string | null;
   estado_civil?: string | null;
