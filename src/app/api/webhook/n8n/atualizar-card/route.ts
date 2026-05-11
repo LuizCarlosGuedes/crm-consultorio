@@ -64,14 +64,43 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data, error } = await supabase
+  const { data: dataById, error: errorById } = await supabase
     .from('leads')
     .update(updateData)
     .eq('id', String(card_id))
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!errorById) {
+    return NextResponse.json({ success: true, lead: dataById });
+  }
 
-  return NextResponse.json({ success: true, lead: data });
+  // PGRST116 = nenhuma linha retornada; tenta fallback por telefone
+  if (errorById.code === 'PGRST116' && campos.telefone) {
+    const { data: dataByTel, error: errorByTel } = await supabase
+      .from('leads')
+      .update(updateData)
+      .eq('telefone', String(campos.telefone))
+      .select()
+      .single();
+
+    if (!errorByTel) {
+      return NextResponse.json({ success: true, lead: dataByTel, resolved_by: 'telefone' });
+    }
+
+    if (errorByTel.code === 'PGRST116') {
+      return NextResponse.json(
+        { error: 'Lead não encontrado por card_id nem por telefone' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ error: errorByTel.message }, { status: 500 });
+  }
+
+  if (errorById.code === 'PGRST116') {
+    return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 });
+  }
+
+  return NextResponse.json({ error: errorById.message }, { status: 500 });
 }
