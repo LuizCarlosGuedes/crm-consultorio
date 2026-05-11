@@ -23,7 +23,6 @@ export default function Home() {
   const [searchTerm,   setSearchTerm]   = useState('');
   const [filterPrioridade, setFilterPrioridade] = useState('todos');
   const [filterEtapa,      setFilterEtapa]      = useState('todas');
-  const [showAll,  setShowAll]          = useState(false);
   const [pendencias, setPendencias]     = useState<Pendencia[]>([]);
   const [pendenciasLoading, setPendenciasLoading] = useState(false);
 
@@ -78,8 +77,6 @@ export default function Home() {
       const pid = l.pipeline_id ?? 1;
       return pid === pipelineId;
     });
-
-    if (showAll) return doPipeline;
 
     return doPipeline.filter(lead => {
       const matchesSearch =
@@ -217,8 +214,6 @@ export default function Home() {
         filterEtapa={filterEtapa}
         onFilterEtapaChange={setFilterEtapa}
         stages={activeStages}
-        showAll={showAll}
-        onShowAllToggle={() => setShowAll(p => !p)}
         onAddLead={() => setShowAddModal(true)}
         onRefresh={fetchLeads}
         pendenciasCount={pendencias.length}

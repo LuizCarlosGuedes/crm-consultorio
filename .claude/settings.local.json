@@ -13,7 +13,9 @@
       "Bash(New-Item -ItemType Directory -Path \"C:\\\\Users\\\\douto\\\\Desktop\\\\meu-crm-consultorio\\\\src\\\\app\\\\api\\\\pendencias\" -Force)",
       "Bash(Out-Null)",
       "Bash(New-Item -ItemType Directory -Path \"C:\\\\Users\\\\douto\\\\Desktop\\\\meu-crm-consultorio\\\\src\\\\app\\\\api\\\\webhook\\\\n8n\\\\resolver-pendencia\" -Force)",
-      "Bash(Write-Host \"Directories created\")"
+      "Bash(Write-Host \"Directories created\")",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\douto\\\\Desktop\\\\meu-crm-consultorio\\\\\" -Name | Where-Object { $_ -match \"\\\\.env|migration\" })",
+      "Bash(npx tsc *)"
     ]
   }
 }

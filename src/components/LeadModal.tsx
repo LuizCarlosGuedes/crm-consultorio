@@ -142,7 +142,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
 
   return (
     <Dialog open={!!lead} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <div className="flex items-start gap-3">
             <div
@@ -206,11 +206,11 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
         </DialogHeader>
 
         <ScrollArea className="flex-1 min-h-0">
-          <div className="px-1 pb-4 space-y-4">
+          <div className="px-6 pt-5 pb-6 space-y-5">
 
             {/* ── DETALHES ── */}
             {activeSection === 'detalhes' && (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {/* Stage + SLA */}
                 <div
                   className="flex items-center gap-2 p-3 rounded-lg border"
@@ -229,8 +229,8 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="min-w-0">
                     <label className="text-xs text-muted-foreground mb-1 block">Nome</label>
                     {isEditing ? (
                       <Input value={d.nome ?? ''} onChange={e => setEditData(p => ({ ...p, nome: e.target.value }))} className="h-8 text-sm" />
@@ -329,17 +329,17 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
 
             {/* ── PERFIL ── */}
             {activeSection === 'perfil' && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="min-w-0">
                     <label className="text-xs text-muted-foreground mb-1 block">Data de Nascimento</label>
                     {isEditing ? (
                       <Input type="date" value={d.data_nascimento ?? lead.data_nascimento ?? ''} onChange={e => setEditData(p => ({ ...p, data_nascimento: e.target.value }))} className="h-8 text-sm" />
                     ) : (
-                      <p className="text-sm">{lead.data_nascimento ? `${lead.data_nascimento} (${idade} anos)` : '—'}</p>
+                      <p className="text-sm break-words">{lead.data_nascimento ? `${lead.data_nascimento} (${idade} anos)` : '—'}</p>
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-xs text-muted-foreground mb-1 block">Sexo</label>
                     {isEditing ? (
                       <Select value={d.sexo ?? lead.sexo ?? ''} onValueChange={v => setEditData(p => ({ ...p, sexo: v }))}>
@@ -354,7 +354,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
                       <p className="text-sm">{lead.sexo || '—'}</p>
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-xs text-muted-foreground mb-1 block">Estado Civil</label>
                     {isEditing ? (
                       <Select value={d.estado_civil ?? lead.estado_civil ?? ''} onValueChange={v => setEditData(p => ({ ...p, estado_civil: v }))}>
@@ -366,38 +366,38 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
                         </SelectContent>
                       </Select>
                     ) : (
-                      <p className="text-sm">{lead.estado_civil || '—'}</p>
+                      <p className="text-sm break-words">{lead.estado_civil || '—'}</p>
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-xs text-muted-foreground mb-1 block">Profissão</label>
                     {isEditing ? (
                       <Input value={d.profissao ?? lead.profissao ?? ''} onChange={e => setEditData(p => ({ ...p, profissao: e.target.value }))} className="h-8 text-sm" />
                     ) : (
-                      <p className="text-sm">{lead.profissao || '—'}</p>
+                      <p className="text-sm break-words">{lead.profissao || '—'}</p>
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-xs text-muted-foreground mb-1 block">CPF</label>
                     {isEditing ? (
                       <Input value={d.cpf ?? lead.cpf ?? ''} onChange={e => setEditData(p => ({ ...p, cpf: e.target.value }))} className="h-8 text-sm" placeholder="000.000.000-00" />
                     ) : (
-                      <p className="text-sm font-mono">{lead.cpf || '—'}</p>
+                      <p className="text-sm font-mono break-all">{lead.cpf || '—'}</p>
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-xs text-muted-foreground mb-1 block">RG</label>
                     {isEditing ? (
                       <Input value={d.rg ?? lead.rg ?? ''} onChange={e => setEditData(p => ({ ...p, rg: e.target.value }))} className="h-8 text-sm" />
                     ) : (
-                      <p className="text-sm font-mono">{lead.rg || '—'}</p>
+                      <p className="text-sm font-mono break-all">{lead.rg || '—'}</p>
                     )}
                   </div>
                 </div>
 
-                <div className="border-t border-border pt-3">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Endereço</p>
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs font-medium text-muted-foreground mb-3">Endereço</p>
+                  <div className="grid grid-cols-2 gap-4">
                     {[
                       { key: 'endereco',    label: 'Logradouro',   span: true  },
                       { key: 'numero',      label: 'Número',       span: false },
@@ -407,7 +407,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
                       { key: 'cidade',      label: 'Cidade',       span: false },
                       { key: 'estado',      label: 'Estado (UF)',  span: false },
                     ].map(({ key, label, span }) => (
-                      <div key={key} className={span ? 'col-span-2' : ''}>
+                      <div key={key} className={cn(span ? 'col-span-2' : 'min-w-0')}>
                         <label className="text-xs text-muted-foreground mb-1 block">{label}</label>
                         {isEditing ? (
                           <Input
@@ -416,25 +416,25 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
                             className="h-8 text-sm"
                           />
                         ) : (
-                          <p className="text-sm">{(lead as unknown as Record<string, string>)[key] || '—'}</p>
+                          <p className="text-sm break-words">{(lead as unknown as Record<string, string>)[key] || '—'}</p>
                         )}
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="border-t border-border pt-3">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Como Conheceu / Indicação</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs font-medium text-muted-foreground mb-3">Como Conheceu / Indicação</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="min-w-0">
                       <label className="text-xs text-muted-foreground mb-1 block">Como conheceu</label>
                       {isEditing ? (
                         <Input value={d.como_conheceu ?? lead.como_conheceu ?? ''} onChange={e => setEditData(p => ({ ...p, como_conheceu: e.target.value }))} className="h-8 text-sm" placeholder="Ex: Indicação amigo" />
                       ) : (
-                        <p className="text-sm">{lead.como_conheceu || '—'}</p>
+                        <p className="text-sm break-words">{lead.como_conheceu || '—'}</p>
                       )}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="text-xs text-muted-foreground mb-1 block">Foi Indicação?</label>
                       {isEditing ? (
                         <Select value={String(d.foi_indicacao ?? lead.foi_indicacao ?? false)} onValueChange={v => setEditData(p => ({ ...p, foi_indicacao: v === 'true' }))}>
@@ -452,8 +452,8 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
                 </div>
 
                 {/* Tags */}
-                <div className="border-t border-border pt-3">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Tags Clínicas</p>
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs font-medium text-muted-foreground mb-3">Tags Clínicas</p>
                   {isEditing ? (
                     <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
                       {TAGS.map(tag => {
@@ -488,7 +488,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 border-t border-border pt-3">
+                <div className="grid grid-cols-3 gap-4 border-t border-border pt-4">
                   <div className="text-center">
                     <p className="text-[10px] text-muted-foreground">Consultas</p>
                     <p className="text-lg font-bold">{lead.numero_consultas ?? 0}</p>
@@ -507,7 +507,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
 
             {/* ── FINANCEIRO ── */}
             {activeSection === 'financeiro' && (
-              <div className="space-y-3">
+              <div className="space-y-5">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold">Total: {formatarMoeda(totalFinanceiro)}</p>
                   <span className="text-xs text-muted-foreground">{financeiro.length} registros</span>
@@ -528,7 +528,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
 
             {/* ── HISTÓRICO ── */}
             {activeSection === 'historico' && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {historico.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-6">Nenhuma movimentação.</p>
                 ) : historico.map((h, i) => (
@@ -562,8 +562,8 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
 
             {/* ── NOTAS ── */}
             {activeSection === 'notas' && (
-              <div className="space-y-3">
-                <div className="p-3 border border-border rounded-lg space-y-2 bg-muted/20">
+              <div className="space-y-5">
+                <div className="p-4 border border-border rounded-lg space-y-3 bg-muted/20">
                   <Textarea
                     placeholder="Adicionar nova nota..."
                     value={newNota}
@@ -598,7 +598,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
         </ScrollArea>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-1 py-3 border-t border-border flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-border flex-shrink-0">
           <div className="flex items-center gap-2">
             {/* Excluir Lead */}
             {onDeleteCard && !isEditing && (

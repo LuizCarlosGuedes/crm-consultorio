@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, Plus, RefreshCw, Eye, LayoutGrid, List } from 'lucide-react';
+import { Search, Plus, RefreshCw, LayoutGrid, List } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { Stage } from '@/lib/types';
 
@@ -19,8 +19,6 @@ interface HeaderProps {
   filterEtapa: string;
   onFilterEtapaChange: (val: string) => void;
   stages: Stage[];
-  showAll: boolean;
-  onShowAllToggle: () => void;
   onAddLead: () => void;
   onRefresh: () => void;
   pendenciasCount?: number;
@@ -48,7 +46,6 @@ export function Header({
   filterPrioridade, onFilterChange,
   filterEtapa, onFilterEtapaChange,
   stages,
-  showAll, onShowAllToggle,
   onAddLead, onRefresh,
   pendenciasCount = 0,
 }: HeaderProps) {
@@ -245,19 +242,6 @@ export function Header({
             })}
           </div>
 
-          {/* Ver Todos */}
-          <button
-            onClick={onShowAllToggle}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0"
-            style={
-              showAll
-                ? { backgroundColor: '#c2a650', color: '#0b1a35', fontWeight: 700 }
-                : { backgroundColor: '#3f4e6850', color: '#e0e0e0' }
-            }
-          >
-            <Eye className="h-3 w-3" />
-            Ver Todos
-          </button>
         </div>
       )}
     </header>
