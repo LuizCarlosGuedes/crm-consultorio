@@ -22,6 +22,7 @@ export interface Lead {
   // Dados pessoais
   email?: string | null;
   data_nascimento?: string | null;
+  idade?: number | null;
   sexo?: string | null;
   estado_civil?: string | null;
   cpf?: string | null;

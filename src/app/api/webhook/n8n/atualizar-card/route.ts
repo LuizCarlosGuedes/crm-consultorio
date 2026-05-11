@@ -13,7 +13,7 @@ const CAMPOS_PERMITIDOS = new Set([
   'nome', 'telefone', 'origem', 'procedimento', 'prioridade',
   'valor_consulta', 'nota', 'chatwoot_url',
   // Dados pessoais
-  'email', 'data_nascimento', 'sexo', 'estado_civil', 'cpf', 'rg',
+  'email', 'data_nascimento', 'idade', 'sexo', 'estado_civil', 'cpf', 'rg',
   // Endereço
   'endereco', 'numero', 'complemento', 'bairro', 'cep', 'cidade', 'estado',
   // Perfil clínico

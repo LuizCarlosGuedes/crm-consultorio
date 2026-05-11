@@ -340,7 +340,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
                     )}
                   </div>
                   <div className="min-w-0">
-                    <label className="text-xs text-muted-foreground mb-1 block">Sexo</label>
+                    <label className="text-xs text-muted-foreground mb-1 block">Gênero</label>
                     {isEditing ? (
                       <Select value={d.sexo ?? lead.sexo ?? ''} onValueChange={v => setEditData(p => ({ ...p, sexo: v }))}>
                         <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Selecionar" /></SelectTrigger>
@@ -353,6 +353,12 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
                     ) : (
                       <p className="text-sm">{lead.sexo || '—'}</p>
                     )}
+                  </div>
+                  <div className="min-w-0">
+                    <label className="text-xs text-muted-foreground mb-1 block">Idade</label>
+                    <p className="text-sm">
+                      {lead.idade != null ? `${lead.idade} anos` : '—'}
+                    </p>
                   </div>
                   <div className="min-w-0">
                     <label className="text-xs text-muted-foreground mb-1 block">Estado Civil</label>
