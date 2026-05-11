@@ -24,6 +24,7 @@ export interface Lead {
   data_nascimento?: string | null;
   idade?: number | null;
   sexo?: string | null;
+  genero?: string | null;
   estado_civil?: string | null;
   cpf?: string | null;
   rg?: string | null;

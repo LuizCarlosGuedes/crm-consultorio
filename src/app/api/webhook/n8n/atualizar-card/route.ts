@@ -7,13 +7,12 @@ function autenticar(req: NextRequest): boolean {
   return token === (process.env.WEBHOOK_SECRET_TOKEN ?? '');
 }
 
-// Campos diretos aceitos (nome no body = nome na coluna)
 const CAMPOS_PERMITIDOS = new Set([
   // Básicos
   'nome', 'telefone', 'origem', 'procedimento', 'prioridade',
   'valor_consulta', 'nota', 'chatwoot_url',
   // Dados pessoais
-  'email', 'data_nascimento', 'idade', 'sexo', 'estado_civil', 'cpf', 'rg',
+  'email', 'data_nascimento', 'idade', 'sexo', 'genero', 'estado_civil', 'cpf', 'rg',
   // Endereço
   'endereco', 'numero', 'complemento', 'bairro', 'cep', 'cidade', 'estado',
   // Perfil clínico
@@ -22,11 +21,6 @@ const CAMPOS_PERMITIDOS = new Set([
   // Automação
   'ultima_mensagem',
 ]);
-
-// Campos que chegam com nome diferente do banco
-const ALIAS: Record<string, string> = {
-  genero: 'sexo',
-};
 
 export async function POST(req: NextRequest) {
   if (!autenticar(req)) {
@@ -51,15 +45,21 @@ export async function POST(req: NextRequest) {
   const updateData: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(campos)) {
-    const coluna = ALIAS[key] ?? key;
-    if (CAMPOS_PERMITIDOS.has(coluna)) {
-      updateData[coluna] = value;
+    if (CAMPOS_PERMITIDOS.has(key)) {
+      updateData[key] = value;
     }
+  }
+
+  // genero e sexo são espelhos: qualquer um recebido popula os dois
+  const generoSexo = updateData['genero'] ?? updateData['sexo'];
+  if (generoSexo !== undefined) {
+    updateData['genero'] = generoSexo;
+    updateData['sexo']   = generoSexo;
   }
 
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json(
-      { error: 'Nenhum campo válido para atualizar.', campos_aceitos: Array.from(CAMPOS_PERMITIDOS).concat(Object.keys(ALIAS)) },
+      { error: 'Nenhum campo válido para atualizar.', campos_aceitos: Array.from(CAMPOS_PERMITIDOS) },
       { status: 400 }
     );
   }

@@ -340,9 +340,12 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
                     )}
                   </div>
                   <div className="min-w-0">
-                    <label className="text-xs text-muted-foreground mb-1 block">Gênero</label>
+                    <label className="text-xs text-muted-foreground mb-1 block">Gênero/Sexo</label>
                     {isEditing ? (
-                      <Select value={d.sexo ?? lead.sexo ?? ''} onValueChange={v => setEditData(p => ({ ...p, sexo: v }))}>
+                      <Select
+                        value={d.sexo ?? d.genero ?? lead.sexo ?? lead.genero ?? ''}
+                        onValueChange={v => setEditData(p => ({ ...p, sexo: v, genero: v }))}
+                      >
                         <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Selecionar" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="M">Masculino</SelectItem>
@@ -351,7 +354,7 @@ export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }:
                         </SelectContent>
                       </Select>
                     ) : (
-                      <p className="text-sm">{lead.sexo || '—'}</p>
+                      <p className="text-sm">{lead.genero || lead.sexo || '—'}</p>
                     )}
                   </div>
                   <div className="min-w-0">
