@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
     nome, telefone, origem, procedimento, prioridade,
     nota, valor_consulta, chatwoot_url, pipeline_id,
     tags, profissao, como_conheceu, foi_indicacao,
+    // Dados pessoais / cadastrais
+    email, cpf, rg, data_nascimento, sexo, genero, idade, estado_civil,
+    // Endereço
+    endereco, numero, complemento, bairro, cidade, estado, cep,
   } = body;
 
   if (!nome || !telefone) {
@@ -58,6 +62,23 @@ export async function POST(req: NextRequest) {
       profissao:      profissao     || null,
       como_conheceu:  como_conheceu || null,
       foi_indicacao:  foi_indicacao ?? false,
+      // Dados pessoais / cadastrais
+      email:          email          || null,
+      cpf:            cpf            || null,
+      rg:             rg             || null,
+      data_nascimento: data_nascimento || null,
+      sexo:           sexo           || null,
+      genero:         genero         || null,
+      idade:          idade          ?? null,
+      estado_civil:   estado_civil   || null,
+      // Endereço
+      endereco:       endereco       || null,
+      numero:         numero         || null,
+      complemento:    complemento    || null,
+      bairro:         bairro         || null,
+      cidade:         cidade         || null,
+      estado:         estado         || null,
+      cep:            cep            || null,
     })
     .select()
     .single();

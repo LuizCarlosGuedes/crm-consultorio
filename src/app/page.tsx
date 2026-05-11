@@ -151,6 +151,16 @@ export default function Home() {
 
   async function handlePacienteConsultou(lead: Lead) {
     // 1. Cria novo card no Pipeline 2 na etapa Compareceu
+    console.log('[PacienteConsultou] Dados do lead antes do POST:', {
+      nome: lead.nome, telefone: lead.telefone, email: lead.email,
+      cpf: lead.cpf, rg: lead.rg, data_nascimento: lead.data_nascimento,
+      sexo: lead.sexo, genero: lead.genero, idade: lead.idade,
+      estado_civil: lead.estado_civil, profissao: lead.profissao,
+      endereco: lead.endereco, numero: lead.numero, complemento: lead.complemento,
+      bairro: lead.bairro, cidade: lead.cidade, estado: lead.estado, cep: lead.cep,
+      origem: lead.origem, prioridade: lead.prioridade, nota: lead.nota,
+      tags: lead.tags, chatwoot_url: lead.chatwoot_url,
+    });
     await fetch('/api/leads', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
