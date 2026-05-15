@@ -108,3 +108,22 @@ export interface ConteudoNutricao {
   ativo: boolean;
   created_at: string;
 }
+
+export interface Retorno {
+  id: string;
+  paciente_id: string | null;
+  paciente_nome: string;
+  paciente_telefone: string;
+  consulta_id: string | null;
+  status: 'pendente' | 'agendado' | 'reativado';
+  data_retorno: string | null;
+  contato_pos_consulta_at: string | null;
+  contato_40dias_at: string | null;
+  contato_30dias_at: string | null;
+  contato_10dias_at: string | null;
+  agendou_retorno: boolean;
+  crm_card_id: string | null;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}

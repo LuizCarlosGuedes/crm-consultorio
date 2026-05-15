@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Lead, Pendencia } from '@/lib/types';
+import { Lead, Pendencia, Retorno } from '@/lib/types';
 import { PIPELINE_1, PIPELINE_2 } from '@/lib/constants';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { ListView } from '@/components/ListView';
@@ -10,6 +10,7 @@ import { Dashboard } from '@/components/dashboard/Dashboard';
 import { LeadModal } from '@/components/LeadModal';
 import { AddLeadModal } from '@/components/AddLeadModal';
 import { PendenciasView } from '@/components/PendenciasView';
+import { RetornosView } from '@/components/RetornosView';
 import { Header, ActiveTab, ViewMode } from '@/components/Header';
 import { Loader2 } from 'lucide-react';
 
@@ -25,6 +26,8 @@ export default function Home() {
   const [filterEtapa,      setFilterEtapa]      = useState('todas');
   const [pendencias, setPendencias]     = useState<Pendencia[]>([]);
   const [pendenciasLoading, setPendenciasLoading] = useState(false);
+  const [retornos, setRetornos]         = useState<Retorno[]>([]);
+  const [retornosLoading, setRetornosLoading] = useState(false);
 
   const fetchLeads = useCallback(async () => {
     const { data, error } = await supabase
@@ -46,9 +49,20 @@ export default function Home() {
     setPendenciasLoading(false);
   }, []);
 
+  const fetchRetornos = useCallback(async () => {
+    setRetornosLoading(true);
+    const { data, error } = await supabase
+      .from('retornos')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error && data) setRetornos(data as Retorno[]);
+    setRetornosLoading(false);
+  }, []);
+
   useEffect(() => {
     fetchLeads();
     fetchPendencias();
+    fetchRetornos();
 
     const leadsChannel = supabase
       .channel('leads-realtime')
@@ -60,11 +74,17 @@ export default function Home() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pendencias' }, fetchPendencias)
       .subscribe();
 
+    const retornosChannel = supabase
+      .channel('retornos-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'retornos' }, fetchRetornos)
+      .subscribe();
+
     return () => {
       supabase.removeChannel(leadsChannel);
       supabase.removeChannel(pendenciasChannel);
+      supabase.removeChannel(retornosChannel);
     };
-  }, [fetchLeads, fetchPendencias]);
+  }, [fetchLeads, fetchPendencias, fetchRetornos]);
 
   // Reset filtro de etapa ao trocar de pipeline
   function handleTabChange(tab: ActiveTab) {
@@ -221,6 +241,10 @@ export default function Home() {
     setPendencias(prev => prev.filter(p => p.id !== id));
   }
 
+  function handleUpdateRetorno(id: string, updates: Partial<Retorno>) {
+    setRetornos(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+  }
+
   const activePipeline = activeTab === 'pipeline2' ? 2 : 1;
   const activeStages   = activeTab === 'pipeline2' ? PIPELINE_2 : PIPELINE_1;
   const leadsP1        = filtrarLeads(leads, 1);
@@ -317,6 +341,16 @@ export default function Home() {
                 loading={pendenciasLoading}
                 onResolve={handleResolvePendencia}
                 onRefresh={fetchPendencias}
+              />
+            )}
+
+            {/* Retornos */}
+            {activeTab === 'retornos' && (
+              <RetornosView
+                retornos={retornos}
+                loading={retornosLoading}
+                onRefresh={fetchRetornos}
+                onUpdate={handleUpdateRetorno}
               />
             )}
           </>

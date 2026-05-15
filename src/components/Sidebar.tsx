@@ -1,10 +1,10 @@
 'use client';
 
-import { LayoutGrid, List, BarChart3, Settings, ClipboardList } from 'lucide-react';
+import { LayoutGrid, List, BarChart3, Settings, ClipboardList, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
-type ViewType = 'kanban' | 'lista' | 'dashboard' | 'configuracoes' | 'pendencias';
+type ViewType = 'kanban' | 'lista' | 'dashboard' | 'configuracoes' | 'pendencias' | 'retornos';
 
 interface SidebarProps {
   view: ViewType;
@@ -18,6 +18,7 @@ const MENU_ITEMS = [
   { id: 'lista',        icon: List,          label: 'Lista' },
   { id: 'dashboard',    icon: BarChart3,     label: 'Dashboard' },
   { id: 'pendencias',   icon: ClipboardList, label: 'Pendências' },
+  { id: 'retornos',     icon: RotateCcw,     label: 'Retornos' },
   { id: 'configuracoes',icon: Settings,      label: 'Configurações' },
 ] as const;
 
