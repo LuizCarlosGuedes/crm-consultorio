@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { RotateCcw, Phone, RefreshCw, Loader2, CheckCircle2, Pencil, Check, X } from 'lucide-react';
+import { RotateCcw, Phone, RefreshCw, Loader2, CheckCircle2, Pencil, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { Retorno } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
@@ -37,6 +37,10 @@ export function RetornosView({ retornos, loading, onRefresh, onUpdate }: Retorno
   const [editando, setEditando] = useState<EditingState>(null);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
+  const [reativadosAbertos, setReativadosAbertos] = useState(false);
+
+  const ativos     = retornos.filter(r => r.status !== 'reativado');
+  const reativados = retornos.filter(r => r.status === 'reativado');
 
   function iniciarEdicao(r: Retorno, campo: 'data_retorno' | 'observacoes') {
     setEditando({ id: r.id, campo });
@@ -86,7 +90,7 @@ export function RetornosView({ retornos, loading, onRefresh, onUpdate }: Retorno
           <h2 className="text-base font-semibold">Candidatos a Retorno</h2>
           {!loading && (
             <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-muted text-muted-foreground">
-              {retornos.length}
+              {ativos.length}
             </span>
           )}
         </div>
@@ -111,7 +115,7 @@ export function RetornosView({ retornos, loading, onRefresh, onUpdate }: Retorno
       )}
 
       {/* Vazio */}
-      {!loading && retornos.length === 0 && (
+      {!loading && ativos.length === 0 && (
         <div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-2">
           <CheckCircle2 className="h-8 w-8 text-emerald-500/60" />
           <p className="text-sm font-medium">Nenhum candidato a retorno</p>
@@ -120,7 +124,7 @@ export function RetornosView({ retornos, loading, onRefresh, onUpdate }: Retorno
       )}
 
       {/* Tabela */}
-      {!loading && retornos.length > 0 && (
+      {!loading && ativos.length > 0 && (
         <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
           <table className="w-full text-sm">
             <thead>
@@ -134,7 +138,7 @@ export function RetornosView({ retornos, loading, onRefresh, onUpdate }: Retorno
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {retornos.map(r => {
+              {ativos.map(r => {
                 const dias = calcDias(r.data_retorno);
                 const statusCfg = STATUS_CONFIG[r.status] ?? STATUS_CONFIG.pendente;
                 const editandoData = editando?.id === r.id && editando.campo === 'data_retorno';
@@ -264,6 +268,59 @@ export function RetornosView({ retornos, loading, onRefresh, onUpdate }: Retorno
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Seção Reativados */}
+      {!loading && reativados.length > 0 && (
+        <div className="mt-4">
+          <button
+            onClick={() => setReativadosAbertos(v => !v)}
+            className="flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors mb-2"
+          >
+            {reativadosAbertos
+              ? <ChevronDown className="h-3.5 w-3.5" />
+              : <ChevronRight className="h-3.5 w-3.5" />
+            }
+            Reativados
+            <span className="px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-bold">
+              {reativados.length}
+            </span>
+          </button>
+
+          {reativadosAbertos && (
+            <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm opacity-70">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">Nome</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">Telefone</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">Data Retorno</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Observações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {reativados.map(r => (
+                    <tr key={r.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 font-medium whitespace-nowrap">{r.paciente_nome}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5 text-foreground/80 font-mono text-xs">
+                          <Phone className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          {r.paciente_telefone}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-foreground/70">
+                        {formatDataBR(r.data_retorno)}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-foreground/70 max-w-xs truncate">
+                        {r.observacoes || <span className="text-muted-foreground italic">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
