@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPool } from '@/lib/postgres';
+import { createServerClient } from '@/lib/supabase-server';
 
 function autenticar(req: NextRequest): boolean {
   const auth = req.headers.get('authorization') ?? '';
@@ -19,24 +19,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
   }
 
-  const { telefone } = body;
+  const { nome, telefone } = body;
 
-  if (!telefone) {
-    return NextResponse.json({ error: 'telefone é obrigatório' }, { status: 400 });
+  if (!nome || !telefone) {
+    return NextResponse.json({ error: 'nome e telefone são obrigatórios' }, { status: 400 });
   }
 
-  const pool = getPool();
+  const supabase = createServerClient();
 
-  const { rowCount } = await pool.query(
-    `UPDATE pacientes
-     SET descadastrado = true, descadastrado_at = NOW()
-     WHERE telefone = $1`,
-    [String(telefone)]
-  );
+  const { data, error } = await supabase
+    .from('descadastrados')
+    .insert({ nome: String(nome), telefone: String(telefone) })
+    .select()
+    .single();
 
-  if (rowCount === 0) {
-    return NextResponse.json({ error: 'Paciente não encontrado' }, { status: 404 });
-  }
-
-  return NextResponse.json({ success: true, telefone, atualizado: rowCount });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true, descadastrado: data }, { status: 201 });
 }
