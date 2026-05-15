@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getPool } from '@/lib/postgres';
+import { createServerClient } from '@/lib/supabase-server';
 
 export async function GET() {
-  const pool = getPool();
+  const supabase = createServerClient();
 
-  const { rows } = await pool.query(
-    `SELECT id, nome, telefone, email, descadastrado_at, created_at
-     FROM pacientes
-     WHERE descadastrado = true
-     ORDER BY descadastrado_at DESC`
-  );
+  const { data, error } = await supabase
+    .from('descadastrados')
+    .select('*')
+    .order('descadastrado_at', { ascending: false });
 
-  return NextResponse.json(rows);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
 }
