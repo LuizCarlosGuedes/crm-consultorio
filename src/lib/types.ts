@@ -109,6 +109,15 @@ export interface ConteudoNutricao {
   created_at: string;
 }
 
+export interface Descadastrado {
+  id: string;
+  nome: string;
+  telefone: string;
+  email: string | null;
+  descadastrado_at: string | null;
+  created_at: string;
+}
+
 export interface Retorno {
   id: string;
   paciente_id: string | null;

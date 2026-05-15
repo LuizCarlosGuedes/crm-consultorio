@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Lead, Pendencia, Retorno } from '@/lib/types';
+import { Lead, Pendencia, Retorno, Descadastrado } from '@/lib/types';
 import { PIPELINE_1, PIPELINE_2 } from '@/lib/constants';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { ListView } from '@/components/ListView';
@@ -11,6 +11,7 @@ import { LeadModal } from '@/components/LeadModal';
 import { AddLeadModal } from '@/components/AddLeadModal';
 import { PendenciasView } from '@/components/PendenciasView';
 import { RetornosView } from '@/components/RetornosView';
+import { DescadastradosView } from '@/components/DescadastradosView';
 import { Header, ActiveTab, ViewMode } from '@/components/Header';
 import { Loader2 } from 'lucide-react';
 
@@ -28,6 +29,8 @@ export default function Home() {
   const [pendenciasLoading, setPendenciasLoading] = useState(false);
   const [retornos, setRetornos]         = useState<Retorno[]>([]);
   const [retornosLoading, setRetornosLoading] = useState(false);
+  const [descadastrados, setDescadastrados] = useState<Descadastrado[]>([]);
+  const [descadastradosLoading, setDescadastradosLoading] = useState(false);
 
   const fetchLeads = useCallback(async () => {
     const { data, error } = await supabase
@@ -59,10 +62,24 @@ export default function Home() {
     setRetornosLoading(false);
   }, []);
 
+  const fetchDescadastrados = useCallback(async () => {
+    setDescadastradosLoading(true);
+    try {
+      const res = await fetch('/api/descadastrados');
+      if (res.ok) {
+        const data = await res.json();
+        setDescadastrados(data as Descadastrado[]);
+      }
+    } finally {
+      setDescadastradosLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchLeads();
     fetchPendencias();
     fetchRetornos();
+    fetchDescadastrados();
 
     const leadsChannel = supabase
       .channel('leads-realtime')
@@ -84,7 +101,7 @@ export default function Home() {
       supabase.removeChannel(pendenciasChannel);
       supabase.removeChannel(retornosChannel);
     };
-  }, [fetchLeads, fetchPendencias, fetchRetornos]);
+  }, [fetchLeads, fetchPendencias, fetchRetornos, fetchDescadastrados]);
 
   // Reset filtro de etapa ao trocar de pipeline
   function handleTabChange(tab: ActiveTab) {
@@ -351,6 +368,15 @@ export default function Home() {
                 loading={retornosLoading}
                 onRefresh={fetchRetornos}
                 onUpdate={handleUpdateRetorno}
+              />
+            )}
+
+            {/* Descadastrados */}
+            {activeTab === 'descadastrados' && (
+              <DescadastradosView
+                descadastrados={descadastrados}
+                loading={descadastradosLoading}
+                onRefresh={fetchDescadastrados}
               />
             )}
           </>

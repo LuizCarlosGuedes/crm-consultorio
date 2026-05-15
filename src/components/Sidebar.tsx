@@ -1,10 +1,10 @@
 'use client';
 
-import { LayoutGrid, List, BarChart3, Settings, ClipboardList, RotateCcw } from 'lucide-react';
+import { LayoutGrid, List, BarChart3, Settings, ClipboardList, RotateCcw, UserX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
-type ViewType = 'kanban' | 'lista' | 'dashboard' | 'configuracoes' | 'pendencias' | 'retornos';
+type ViewType = 'kanban' | 'lista' | 'dashboard' | 'configuracoes' | 'pendencias' | 'retornos' | 'descadastrados';
 
 interface SidebarProps {
   view: ViewType;
@@ -14,12 +14,13 @@ interface SidebarProps {
 }
 
 const MENU_ITEMS = [
-  { id: 'kanban',       icon: LayoutGrid,    label: 'Kanban' },
-  { id: 'lista',        icon: List,          label: 'Lista' },
-  { id: 'dashboard',    icon: BarChart3,     label: 'Dashboard' },
-  { id: 'pendencias',   icon: ClipboardList, label: 'Pendências' },
-  { id: 'retornos',     icon: RotateCcw,     label: 'Retornos' },
-  { id: 'configuracoes',icon: Settings,      label: 'Configurações' },
+  { id: 'kanban',          icon: LayoutGrid,    label: 'Kanban' },
+  { id: 'lista',           icon: List,          label: 'Lista' },
+  { id: 'dashboard',       icon: BarChart3,     label: 'Dashboard' },
+  { id: 'pendencias',      icon: ClipboardList, label: 'Pendências' },
+  { id: 'retornos',        icon: RotateCcw,     label: 'Retornos' },
+  { id: 'descadastrados',  icon: UserX,         label: 'Descadastrados' },
+  { id: 'configuracoes',   icon: Settings,      label: 'Configurações' },
 ] as const;
 
 export function Sidebar({ view, onViewChange, topOffset, pendenciasCount = 0 }: SidebarProps) {
