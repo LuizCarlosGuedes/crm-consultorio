@@ -33,6 +33,32 @@ export async function POST(req: NextRequest) {
   }
 
   const pid = Number(pipeline_id ?? 1);
+
+  // Idempotência: se já existe um card para este telefone neste pipeline, devolve o card
+  // EXISTENTE com o `id`. Isso é essencial para a integração com o n8n: sem o `id` o n8n
+  // não consegue mover o card depois (re-contatos ficavam fora de sincronia).
+  const { data: existente } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('telefone', String(telefone))
+    .eq('pipeline_id', pid)
+    .order('data_entrada', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existente) {
+    // Atualiza a última interação e devolve o card existente (com id).
+    await supabase
+      .from('leads')
+      .update({ ultima_interacao: new Date().toISOString() })
+      .eq('id', existente.id);
+
+    return NextResponse.json(
+      { success: true, lead: existente, action: 'updated' },
+      { status: 200 },
+    );
+  }
+
   const etapaInicial = pid === 2 ? 'Compareceu' : 'Novo Lead';
   const slaVencimento = calcSLAVencimento(etapaInicial);
 
@@ -69,5 +95,5 @@ export async function POST(req: NextRequest) {
     movido_por:    'n8n',
   });
 
-  return NextResponse.json({ success: true, lead: data }, { status: 201 });
+  return NextResponse.json({ success: true, lead: data, action: 'created' }, { status: 201 });
 }
