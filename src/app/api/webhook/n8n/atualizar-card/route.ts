@@ -45,9 +45,12 @@ export async function POST(req: NextRequest) {
   const updateData: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(campos)) {
-    if (CAMPOS_PERMITIDOS.has(key)) {
-      updateData[key] = value;
-    }
+    if (!CAMPOS_PERMITIDOS.has(key)) continue;
+    // Não sobrescreve com vazio/null/"null": evita apagar dados já gravados no card
+    // quando o n8n manda um campo do cadastro que veio em branco.
+    const s = value == null ? '' : String(value).trim();
+    if (s === '' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') continue;
+    updateData[key] = value;
   }
 
   // genero e sexo são espelhos: qualquer um recebido popula os dois

@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
   }
 
-  const { card_id, etapa_destino, motivo, pipeline_id } = body;
+  const { card_id, etapa_destino, motivo, pipeline_id, como_conheceu } = body;
 
   if (!card_id || !etapa_destino) {
     return NextResponse.json({ error: 'card_id e etapa_destino são obrigatórios' }, { status: 400 });
@@ -57,6 +57,13 @@ export async function POST(req: NextRequest) {
   };
 
   if (pid) updatePayload.pipeline_id = pid;
+
+  // como_conheceu (origem detectada pela IA, ex.: Instagram) — só grava se vier
+  // preenchido, para nunca apagar um valor já existente no card.
+  const cc = como_conheceu == null ? '' : String(como_conheceu).trim();
+  if (cc && cc.toLowerCase() !== 'null' && cc.toLowerCase() !== 'undefined') {
+    updatePayload.como_conheceu = cc;
+  }
 
   const { data, error } = await supabase
     .from('leads')
