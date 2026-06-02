@@ -5,6 +5,7 @@ import {
   ExternalLink, ArrowRight, Edit2, Save, Plus, X, Trash2, Loader2,
 } from 'lucide-react';
 import { Lead, HistoricoMovimentacao, Nota, Financeiro } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
 import { PIPELINE_1, PIPELINE_2, ORIGENS, PRIORIDADES, TAGS } from '@/lib/constants';
 import {
   calcSLAStatus, formatarData, formatarMoeda, formatarTempoRelativo,
@@ -27,7 +28,26 @@ interface LeadModalProps {
 
 type Section = 'detalhes' | 'perfil' | 'financeiro' | 'historico' | 'notas';
 
-export function LeadModal({ lead, onClose, onUpdate, onMoveCard, onDeleteCard }: LeadModalProps) {
+export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDeleteCard }: LeadModalProps) {
+  // Card "ao vivo": parte do prop e se atualiza sozinho enquanto o modal está aberto
+  // (Supabase Realtime + polling de 10s). Evita ver dado defasado depois que o n8n grava.
+  const [lead, setLead] = useState<Lead | null>(leadProp);
+  useEffect(() => { setLead(leadProp); }, [leadProp]);
+  useEffect(() => {
+    const id = leadProp?.id;
+    if (!id) return;
+    const refetch = async () => {
+      const { data } = await supabase.from('leads').select('*').eq('id', id).single();
+      if (data) setLead(data as Lead);
+    };
+    const ch = supabase
+      .channel(`lead-modal-${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads', filter: `id=eq.${id}` }, refetch)
+      .subscribe();
+    const poll = setInterval(refetch, 10000);
+    return () => { supabase.removeChannel(ch); clearInterval(poll); };
+  }, [leadProp?.id]);
+
   const [isEditing,         setIsEditing]         = useState(false);
   const [editData,          setEditData]          = useState<Partial<Lead>>({});
   const [historico,         setHistorico]         = useState<HistoricoMovimentacao[]>([]);
