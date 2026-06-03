@@ -67,7 +67,7 @@ export function Header({
         style={{ borderBottom: '1px solid #3f4e68' }}
       >
         {/* Logo + Nav */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Hambúrguer — só no mobile */}
           <button
             onClick={() => setMenuOpen(o => !o)}
@@ -93,7 +93,7 @@ export function Header({
           </div>
 
           {/* Nav tabs */}
-          <nav className="hidden md:flex items-center gap-0.5 ml-2">
+          <nav className="hidden md:flex items-center gap-0.5 ml-2 flex-1 min-w-0 overflow-x-auto">
             {TABS.map(tab => {
               const isActive = activeTab === tab.id;
               return (
@@ -133,7 +133,7 @@ export function Header({
         </div>
 
         {/* Right actions */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {/* Kanban / Lista toggle */}
           {showFilterBar && (
             <div
