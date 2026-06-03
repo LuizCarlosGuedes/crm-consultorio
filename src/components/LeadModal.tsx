@@ -32,7 +32,9 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
   // Card "ao vivo": parte do prop e se atualiza sozinho enquanto o modal está aberto
   // (Supabase Realtime + polling de 10s). Evita ver dado defasado depois que o n8n grava.
   const [lead, setLead] = useState<Lead | null>(leadProp);
-  useEffect(() => { setLead(leadProp); }, [leadProp]);
+  // Só reseta para o prop quando ABRE um card diferente (muda o id),
+  // assim a busca ao vivo abaixo nunca é revertida por um prop defasado da página.
+  useEffect(() => { setLead(leadProp); }, [leadProp?.id]);
   useEffect(() => {
     const id = leadProp?.id;
     if (!id) return;
@@ -40,6 +42,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
       const { data } = await supabase.from('leads').select('*').eq('id', id).single();
       if (data) setLead(data as Lead);
     };
+    refetch(); // busca o estado REAL do banco imediatamente ao abrir (não espera 10s)
     const ch = supabase
       .channel(`lead-modal-${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads', filter: `id=eq.${id}` }, refetch)
