@@ -53,7 +53,7 @@ export function AddLeadModal({ open, onClose, onAdd, defaultPipelineId = 1 }: Ad
 
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-4 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="col-span-2">
                 <label className="text-xs text-muted-foreground mb-1 block">Nome completo *</label>
                 <Input

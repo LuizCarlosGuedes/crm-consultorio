@@ -252,7 +252,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="min-w-0">
                     <label className="text-xs text-muted-foreground mb-1 block">Nome</label>
                     {isEditing ? (
@@ -353,7 +353,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
             {/* ── PERFIL ── */}
             {activeSection === 'perfil' && (
               <div className="space-y-5">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="min-w-0">
                     <label className="text-xs text-muted-foreground mb-1 block">Data de Nascimento</label>
                     {isEditing ? (
@@ -429,7 +429,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
 
                 <div className="border-t border-border pt-4">
                   <p className="text-xs font-medium text-muted-foreground mb-3">Endereço</p>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
                       { key: 'endereco',    label: 'Logradouro',   span: true  },
                       { key: 'numero',      label: 'Número',       span: false },
@@ -457,7 +457,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
 
                 <div className="border-t border-border pt-4">
                   <p className="text-xs font-medium text-muted-foreground mb-3">Como Conheceu / Indicação</p>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="min-w-0">
                       <label className="text-xs text-muted-foreground mb-1 block">Como conheceu</label>
                       {isEditing ? (
