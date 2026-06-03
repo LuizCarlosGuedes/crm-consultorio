@@ -56,7 +56,9 @@ export function ListView({ leads, onCardClick }: ListViewProps) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <>
+    {/* Desktop / tablet — tabela completa */}
+    <div className="hidden md:block overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 border-b border-border">
           <tr>
@@ -161,5 +163,49 @@ export function ListView({ leads, onCardClick }: ListViewProps) {
         </tbody>
       </table>
     </div>
+
+    {/* Mobile — cards empilhados (a tabela de 11 colunas não cabe no celular) */}
+    <div className="md:hidden rounded-lg border border-border divide-y divide-border overflow-hidden">
+      {sorted.map(lead => {
+        const etapa = getEtapa(lead.etapa_atual);
+        return (
+          <button
+            key={lead.id}
+            onClick={() => onCardClick(lead)}
+            className="w-full text-left px-3 py-3 hover:bg-muted/30 transition-colors flex flex-col gap-1.5"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className={cn('w-2 h-2 rounded-full flex-shrink-0', {
+                  'bg-red-500 animate-sla-pulse': lead.prioridade === 'urgente',
+                  'bg-orange-500': lead.prioridade === 'alta',
+                  'bg-green-500':  lead.prioridade === 'normal',
+                  'bg-gray-500':   lead.prioridade === 'frio',
+                })} />
+                <span className="font-medium text-sm truncate">{lead.nome}</span>
+                {lead.movido_por_ia && (
+                  <span className="px-1 py-0.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-[9px] font-bold flex-shrink-0">AUTO</span>
+                )}
+              </div>
+              {lead.valor_consulta > 0 && (
+                <span className="text-xs font-semibold text-emerald-500 flex-shrink-0">{formatarMoeda(lead.valor_consulta)}</span>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-xs text-muted-foreground">{lead.telefone}</span>
+              {etapa && (
+                <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-medium border flex-shrink-0', etapa.corBg, etapa.corBorda, etapa.cor)}>
+                  {etapa.nome}
+                </span>
+              )}
+            </div>
+          </button>
+        );
+      })}
+      {sorted.length === 0 && (
+        <div className="px-3 py-8 text-center text-sm text-muted-foreground">Nenhum lead encontrado.</div>
+      )}
+    </div>
+    </>
   );
 }
