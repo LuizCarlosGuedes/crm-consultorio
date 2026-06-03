@@ -1,6 +1,8 @@
 'use client';
 
-import { Search, Plus, RefreshCw, LayoutGrid, List } from 'lucide-react';
+import { useState } from 'react';
+
+import { Search, Plus, RefreshCw, LayoutGrid, List, Menu, X } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { Stage } from '@/lib/types';
 
@@ -52,6 +54,7 @@ export function Header({
   pendenciasCount = 0,
 }: HeaderProps) {
   const showFilterBar = activeTab === 'pipeline1' || activeTab === 'pipeline2';
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header
@@ -65,6 +68,15 @@ export function Header({
       >
         {/* Logo + Nav */}
         <div className="flex items-center gap-3">
+          {/* Hambúrguer — só no mobile */}
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            className="md:hidden w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
+            style={{ color: '#f7f6f4' }}
+            aria-label="Menu"
+          >
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
           <div className="flex items-center gap-2 flex-shrink-0">
             <div
               className="w-7 h-7 rounded-md flex items-center justify-center font-black text-[10px]"
@@ -81,7 +93,7 @@ export function Header({
           </div>
 
           {/* Nav tabs */}
-          <nav className="flex items-center gap-0.5 ml-2">
+          <nav className="hidden md:flex items-center gap-0.5 ml-2">
             {TABS.map(tab => {
               const isActive = activeTab === tab.id;
               return (
@@ -125,7 +137,7 @@ export function Header({
           {/* Kanban / Lista toggle */}
           {showFilterBar && (
             <div
-              className="flex items-center rounded-md overflow-hidden"
+              className="hidden md:flex items-center rounded-md overflow-hidden"
               style={{ border: '1px solid #3f4e68' }}
             >
               {(['kanban', 'lista'] as ViewMode[]).map(v => (
@@ -244,6 +256,35 @@ export function Header({
             })}
           </div>
 
+        </div>
+      )}
+      {/* Menu mobile (abre no hambúrguer) */}
+      {menuOpen && (
+        <div
+          className="md:hidden absolute top-full left-0 right-0 flex flex-col shadow-lg"
+          style={{ backgroundColor: '#0b1a35', borderBottom: '1px solid #3f4e68' }}
+        >
+          {TABS.map(tab => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => { onTabChange(tab.id); setMenuOpen(false); }}
+                className="flex items-center justify-between px-4 py-3 text-sm font-medium text-left transition-colors"
+                style={isActive ? { backgroundColor: '#c2a650', color: '#0b1a35', fontWeight: 700 } : { color: '#e0e0e0' }}
+              >
+                <span>{tab.label}</span>
+                {tab.id === 'pendencias' && pendenciasCount > 0 && (
+                  <span
+                    className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-bold px-1 leading-none"
+                    style={isActive ? { backgroundColor: '#0b1a35', color: '#c2a650' } : { backgroundColor: '#c2a650', color: '#0b1a35' }}
+                  >
+                    {pendenciasCount > 99 ? '99+' : pendenciasCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </header>

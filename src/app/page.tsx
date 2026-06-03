@@ -31,6 +31,7 @@ export default function Home() {
   const [retornosLoading, setRetornosLoading] = useState(false);
   const [descadastrados, setDescadastrados] = useState<Descadastrado[]>([]);
   const [descadastradosLoading, setDescadastradosLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const fetchLeads = useCallback(async () => {
     const { data, error } = await supabase
@@ -102,6 +103,14 @@ export default function Home() {
       supabase.removeChannel(retornosChannel);
     };
   }, [fetchLeads, fetchPendencias, fetchRetornos, fetchDescadastrados]);
+
+  // Detecta tela pequena para forçar a visão em LISTA (Kanban horizontal não serve no celular).
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // Reset filtro de etapa ao trocar de pipeline
   function handleTabChange(tab: ActiveTab) {
@@ -270,6 +279,7 @@ export default function Home() {
 
   const showFilterBar = activeTab === 'pipeline1' || activeTab === 'pipeline2';
   const headerH       = showFilterBar ? 101 : 53;
+  const effectiveView: ViewMode = isMobile ? 'lista' : viewMode;
 
   return (
     <div className="min-h-screen bg-background">
@@ -309,7 +319,7 @@ export default function Home() {
             )}
 
             {/* Pipeline 1 — Captação */}
-            {activeTab === 'pipeline1' && viewMode === 'kanban' && (
+            {activeTab === 'pipeline1' && effectiveView === 'kanban' && (
               <div className="overflow-hidden px-3 pt-3" style={{ height: `calc(100vh - ${headerH}px)` }}>
                 <KanbanBoard
                   stages={PIPELINE_1}
@@ -321,7 +331,7 @@ export default function Home() {
                 />
               </div>
             )}
-            {activeTab === 'pipeline1' && viewMode === 'lista' && (
+            {activeTab === 'pipeline1' && effectiveView === 'lista' && (
               <div className="p-4">
                 <p className="text-sm text-muted-foreground mb-3">
                   {filteredLeads.length} leads no Pipeline 1
@@ -331,7 +341,7 @@ export default function Home() {
             )}
 
             {/* Pipeline 2 — Pacientes Ativos */}
-            {activeTab === 'pipeline2' && viewMode === 'kanban' && (
+            {activeTab === 'pipeline2' && effectiveView === 'kanban' && (
               <div className="overflow-hidden px-3 pt-3" style={{ height: `calc(100vh - ${headerH}px)` }}>
                 <KanbanBoard
                   stages={PIPELINE_2}
@@ -342,7 +352,7 @@ export default function Home() {
                 />
               </div>
             )}
-            {activeTab === 'pipeline2' && viewMode === 'lista' && (
+            {activeTab === 'pipeline2' && effectiveView === 'lista' && (
               <div className="p-4">
                 <p className="text-sm text-muted-foreground mb-3">
                   {filteredLeads.length} leads no Pipeline 2
