@@ -6,7 +6,8 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -27,7 +28,10 @@ export function KanbanBoard({ stages, leads, onMoveCard, onCardClick, onPaciente
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    // Mouse (desktop): arrasta após mover 8px.
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    // Toque (tablet/celular): segura 200ms para arrastar — assim o swipe rola as colunas e o segurar move o card.
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } })
   );
 
   const handleDragStart = (event: DragStartEvent) => {
