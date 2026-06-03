@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
   }
 
-  const { card_id, etapa_destino, motivo, pipeline_id, como_conheceu } = body;
+  const { card_id, etapa_destino, motivo, pipeline_id, ...resto } = body;
 
   if (!card_id || !etapa_destino) {
     return NextResponse.json({ error: 'card_id e etapa_destino são obrigatórios' }, { status: 400 });
@@ -58,11 +58,15 @@ export async function POST(req: NextRequest) {
 
   if (pid) updatePayload.pipeline_id = pid;
 
-  // como_conheceu (origem detectada pela IA, ex.: Instagram) — só grava se vier
-  // preenchido, para nunca apagar um valor já existente no card.
-  const cc = como_conheceu == null ? '' : String(como_conheceu).trim();
-  if (cc && cc.toLowerCase() !== 'null' && cc.toLowerCase() !== 'undefined') {
-    updatePayload.como_conheceu = cc;
+  // Campos de enriquecimento opcionais (detectados pela IA): só gravam se vierem
+  // preenchidos, para nunca apagar um valor já existente no card.
+  const ENRIQUECER = ['como_conheceu', 'queixa_principal', 'indicado_por'];
+  for (const k of ENRIQUECER) {
+    const v = (resto as Record<string, unknown>)[k];
+    const s = v == null ? '' : String(v).trim();
+    if (s && s.toLowerCase() !== 'null' && s.toLowerCase() !== 'undefined') {
+      updatePayload[k] = s;
+    }
   }
 
   const { data, error } = await supabase
