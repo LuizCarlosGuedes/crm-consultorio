@@ -16,7 +16,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { ScrollArea } from './ui/scroll-area';
+// ScrollArea (Radix) removido: quebrava o scroll no flex; usamos overflow-y-auto nativo.
 
 interface LeadModalProps {
   lead: Lead | null;
@@ -228,7 +228,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-3">
           <div className="px-6 pt-5 pb-6 space-y-5">
 
             {/* ── DETALHES ── */}
@@ -627,7 +627,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
             )}
 
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-border flex-shrink-0">
