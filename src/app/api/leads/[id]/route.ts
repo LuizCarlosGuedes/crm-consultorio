@@ -51,6 +51,24 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       motivo:        body.motivo ?? '',
       movido_por:    body.movido_por === 'n8n' ? 'n8n' : 'humano',
     });
+
+    // Espelha a etapa no banco da clínica (pacientes.etapa_crm via n8n) → os fluxos
+    // sabem onde o lead está e ativam/desativam sozinhos. Guarda anti-eco: não dispara
+    // quando foi o próprio n8n que moveu o card (ele já atualizou a clínica do lado dele).
+    if (body.movido_por !== 'n8n') {
+      try {
+        await fetch('https://n8n.drluizguedes.com.br/webhook/crm-sync-etapa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            card_id:  id,
+            telefone: data?.telefone ?? '',
+            etapa:    body.etapa_atual,
+            pipeline: data?.pipeline_id ?? null,
+          }),
+        });
+      } catch { /* não bloqueia o move do card se o n8n estiver indisponível */ }
+    }
   }
 
   return NextResponse.json(data);
@@ -59,6 +77,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = createServerClient();
+  // Remove os filhos (FKs) antes do lead, senão o Postgres barra com 23503.
+  await supabase.from('financeiro').delete().eq('lead_id', id);
+  await supabase.from('historico_movimentacoes').delete().eq('lead_id', id);
+  await supabase.from('notas').delete().eq('lead_id', id);
   const { error } = await supabase.from('leads').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

@@ -23,10 +23,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
   }
 
-  const { card_id, etapa_destino, motivo, pipeline_id, ...resto } = body;
+  const { card_id, telefone, etapa_destino, motivo, pipeline_id, ...resto } = body;
 
-  if (!card_id || !etapa_destino) {
-    return NextResponse.json({ error: 'card_id e etapa_destino são obrigatórios' }, { status: 400 });
+  if (!etapa_destino || (!card_id && !telefone)) {
+    return NextResponse.json({ error: 'etapa_destino e (card_id ou telefone) são obrigatórios' }, { status: 400 });
   }
 
   const pid = pipeline_id ? Number(pipeline_id) : undefined;
@@ -40,21 +40,49 @@ export async function POST(req: NextRequest) {
     }, { status: 400 });
   }
 
-  const { data: current, error: fetchError } = await supabase
-    .from('leads')
-    .select('etapa_atual, pipeline_id')
-    .eq('id', String(card_id))
-    .single();
+  // Acha o lead por card_id; se vier vazio/NULL ou apontar pra um card que não existe
+  // mais (crm_card_id "stale" vindo do n8n), cai pro telefone. O WF03 manda os dois.
+  let current = card_id
+    ? (await supabase.from('leads').select('*').eq('id', String(card_id)).maybeSingle()).data
+    : null;
+  if (!current && telefone) {
+    current = (await supabase
+      .from('leads')
+      .select('*')
+      .eq('telefone', String(telefone))
+      .order('data_atualizacao', { ascending: false })
+      .limit(1)
+      .maybeSingle()).data;
+  }
 
-  if (fetchError) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 });
+  if (!current) return NextResponse.json({ error: 'Lead não encontrado (card_id/telefone)' }, { status: 404 });
 
-  const slaVencimento = calcSLAVencimento(String(etapa_destino));
+  const leadId = String(current.id);
+
+  // Guarda anti-regressão: dentro do funil do Pipeline 1, a IA NUNCA pode rebaixar o card
+  // para uma etapa anterior (ex.: depois de "Agendado", um [ESTAGIO:proposta_consulta]
+  // tardio — quando o paciente só agradece — não pode puxar o card de volta). Movimentos
+  // para fora do funil (No Show, Reagendamento, Follow-up, Perdido…) continuam livres.
+  const FUNIL = ['Novo Lead', 'Triagem IA', 'Qualificado', 'Proposta Enviada', 'Sinal Pago', 'Agendado'];
+  const iAtual   = FUNIL.indexOf(String(current.etapa_atual));
+  const iDestino = FUNIL.indexOf(String(etapa_destino));
+  if (iAtual >= 0 && iDestino >= 0 && iDestino < iAtual) {
+    return NextResponse.json({ success: true, lead: current, skipped: 'regressao_no_funil_bloqueada' });
+  }
+
+  // Só re-arma o SLA quando a etapa MUDA de verdade. A IA re-chama mover-card a cada
+  // mensagem (mesma etapa) — sem essa guarda o sla_vencimento (e, com ele, o "tempo na
+  // coluna") zerava a cada mensagem, dando a impressão de que o lead acabou de chegar.
+  const mudouEtapa = current.etapa_atual !== String(etapa_destino);
 
   const updatePayload: Record<string, unknown> = {
     etapa_atual:    String(etapa_destino),
     movido_por_ia:  true,
-    sla_vencimento: slaVencimento.toISOString(),
   };
+
+  if (mudouEtapa) {
+    updatePayload.sla_vencimento = calcSLAVencimento(String(etapa_destino)).toISOString();
+  }
 
   if (pid) updatePayload.pipeline_id = pid;
 
@@ -72,19 +100,23 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('leads')
     .update(updatePayload)
-    .eq('id', String(card_id))
+    .eq('id', leadId)
     .select()
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  await supabase.from('historico_movimentacoes').insert({
-    lead_id:       String(card_id),
-    etapa_origem:  current.etapa_atual,
-    etapa_destino: String(etapa_destino),
-    motivo:        String(motivo ?? 'Movido pelo N8N'),
-    movido_por:    'n8n',
-  });
+  // Histórico só quando muda de etapa (evita poluir o histórico com re-chamadas da IA
+  // na mesma etapa, que não são movimentações reais).
+  if (mudouEtapa) {
+    await supabase.from('historico_movimentacoes').insert({
+      lead_id:       leadId,
+      etapa_origem:  current.etapa_atual,
+      etapa_destino: String(etapa_destino),
+      motivo:        String(motivo ?? 'Movido pelo N8N'),
+      movido_por:    'n8n',
+    });
+  }
 
   return NextResponse.json({ success: true, lead: data });
 }

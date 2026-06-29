@@ -44,7 +44,30 @@ export function getEtapa(etapaId: string): Stage | undefined {
   return TODAS_ETAPAS.find(e => e.id === etapaId);
 }
 
+// "Eu cuido": marca (tag) que o Dr coloca quando está conduzindo o caso na mão
+// (ex.: cortesia/agendamento especial). Pausa o alarme de SLA — nada de piscar à toa.
+export const TAG_EU_CUIDO = 'Eu cuido';
+export function isSLAPausado(lead: Lead): boolean {
+  return (lead.tags ?? []).some(t => t.trim().toLowerCase() === TAG_EU_CUIDO.toLowerCase());
+}
+
+// "Comercial": marca que a Nathalia aplica quando o contato é comercial/B2B (não-paciente).
+export const TAG_COMERCIAL = 'Comercial';
+export function isComercial(lead: Lead): boolean {
+  return (lead.tags ?? []).some(t => t.trim().toLowerCase() === TAG_COMERCIAL.toLowerCase());
+}
+
+// Tags "internas" (têm renderização própria) → não aparecem na lista normal de chips.
+export function ehTagInterna(t: string): boolean {
+  const x = t.trim().toLowerCase();
+  return x === TAG_EU_CUIDO.toLowerCase() || x === TAG_COMERCIAL.toLowerCase();
+}
+
 export function calcSLAStatus(lead: Lead): SLAStatus {
+  // Dr conduzindo na mão → sem alarme de SLA.
+  if (isSLAPausado(lead)) return 'ok';
+  // Etapas terminais (lead já resolvido): não faz sentido SLA "atrasado" piscando.
+  if (['Agendado', 'Perdido', 'Pós Consulta'].includes(lead.etapa_atual)) return 'ok';
   if (!lead.sla_vencimento) return 'ok';
 
   const now = Date.now();
@@ -127,7 +150,16 @@ export function formatarTag(tag: string): string {
 
 export function diasNaEtapa(lead: Lead): number {
   try {
-    const ms = Date.now() - new Date(lead.data_atualizacao).getTime();
+    // A entrada na etapa é reconstruída a partir do sla_vencimento — gravado como
+    // (entrada_na_etapa + SLA) SOMENTE quando a etapa muda de verdade. Assim o
+    // "tempo na coluna" não zera a cada interação (era o bug de usar data_atualizacao,
+    // que muda em QUALQUER update do card). Fallback: data_entrada (lead recém-criado).
+    const etapa  = getEtapa(lead.etapa_atual);
+    const slaMs  = (etapa?.slaMinutos ?? 60) * 60 * 1000;
+    const baseMs = lead.sla_vencimento
+      ? new Date(lead.sla_vencimento).getTime() - slaMs
+      : new Date(lead.data_entrada).getTime();
+    const ms = Date.now() - baseMs;
     return Math.max(0, Math.floor(ms / 86400000));
   } catch {
     return 0;

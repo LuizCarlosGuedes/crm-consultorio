@@ -44,13 +44,16 @@ export function ListView({ leads, onCardClick }: ListViewProps) {
     return sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   }
 
-  function Th({ col, children }: { col: SortKey; children: React.ReactNode }) {
+  function Th({ col, children, center }: { col: SortKey; children: React.ReactNode; center?: boolean }) {
     return (
       <th
-        className="px-3 py-2 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"
+        className={cn(
+          'px-3 py-2 text-xs font-semibold text-brand-cream/80 cursor-pointer hover:text-brand-cream select-none',
+          center ? 'text-center' : 'text-left',
+        )}
         onClick={() => handleSort(col)}
       >
-        <span className="flex items-center gap-1">{children}<SortIcon col={col} /></span>
+        <span className={cn('flex items-center gap-1', center && 'justify-center')}>{children}<SortIcon col={col} /></span>
       </th>
     );
   }
@@ -58,21 +61,22 @@ export function ListView({ leads, onCardClick }: ListViewProps) {
   return (
     <>
     {/* Desktop / tablet — tabela completa */}
-    <div className="hidden md:block overflow-x-auto rounded-lg border border-border">
+    <div className="hidden md:block overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
       <table className="w-full text-sm">
-        <thead className="bg-muted/50 border-b border-border">
+        <thead className="hdr-navy border-b-2 border-brand-gold">
           <tr>
             <Th col="nome">Paciente</Th>
-            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Telefone</th>
-            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Procedimento</th>
-            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Origem</th>
-            <Th col="prioridade">Prioridade</Th>
-            <Th col="etapa_atual">Etapa</Th>
-            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Pipeline</th>
-            <Th col="valor_consulta">Valor</Th>
-            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">SLA</th>
-            <Th col="data_entrada">Entrada</Th>
-            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Ações</th>
+            <th className="px-3 py-2 text-center text-xs font-semibold text-brand-cream/80">IA</th>
+            <th className="px-3 py-2 text-center text-xs font-semibold text-brand-cream/80">Telefone</th>
+            <th className="px-3 py-2 text-center text-xs font-semibold text-brand-cream/80">Procedimento</th>
+            <th className="px-3 py-2 text-center text-xs font-semibold text-brand-cream/80">Origem</th>
+            <Th col="prioridade" center>Prioridade</Th>
+            <Th col="etapa_atual" center>Etapa</Th>
+            <th className="px-3 py-2 text-center text-xs font-semibold text-brand-cream/80">Pipeline</th>
+            <Th col="valor_consulta" center>Valor</Th>
+            <th className="px-3 py-2 text-center text-xs font-semibold text-brand-cream/80">SLA</th>
+            <Th col="data_entrada" center>Entrada</Th>
+            <th className="px-3 py-2 text-center text-xs font-semibold text-brand-cream/80">Ações</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -94,27 +98,31 @@ export function ListView({ leads, onCardClick }: ListViewProps) {
                       'bg-gray-500':   lead.prioridade === 'frio',
                     })} />
                     <span className="font-medium text-xs">{lead.nome}</span>
-                    {lead.movido_por_ia && (
-                      <span className="px-1 py-0.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-[9px] font-bold">AUTO</span>
-                    )}
                   </div>
                 </td>
-                <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{lead.telefone}</td>
-                <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-[160px] truncate">{lead.procedimento || '—'}</td>
-                <td className="px-3 py-2.5 text-xs">{getOrigemIcon(lead.origem)} {lead.origem}</td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2.5 text-center">
+                  {lead.movido_por_ia ? (
+                    <span className="inline-block px-1.5 py-0.5 bg-blue-500/15 text-blue-500 border border-blue-500/30 rounded text-[9px] font-bold tracking-wide">AUTO</span>
+                  ) : (
+                    <span className="text-muted-foreground/35 text-xs">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-2.5 text-center font-mono text-xs text-muted-foreground">{lead.telefone}</td>
+                <td className="px-3 py-2.5 text-center text-xs text-muted-foreground max-w-[160px] truncate">{lead.procedimento || '—'}</td>
+                <td className="px-3 py-2.5 text-center text-xs">{getOrigemIcon(lead.origem)} {lead.origem}</td>
+                <td className="px-3 py-2.5 text-center">
                   <span className={cn('text-xs font-semibold capitalize', getPrioridadeCor(lead.prioridade))}>
                     {lead.prioridade}
                   </span>
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2.5 text-center">
                   {etapa && (
-                    <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-medium border', etapa.corBg, etapa.corBorda, etapa.cor)}>
+                    <span className={cn('inline-block min-w-[86px] px-2 py-0.5 rounded-full text-[10px] font-medium border', etapa.corBg, etapa.corBorda, etapa.cor)}>
                       {etapa.nome}
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2.5 text-center">
                   {(lead.pipeline_id ?? 1) === 1 ? (
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 text-blue-500 border border-blue-500/30">
                       P1
@@ -125,24 +133,24 @@ export function ListView({ leads, onCardClick }: ListViewProps) {
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2.5 text-xs font-semibold text-emerald-500">
+                <td className="px-3 py-2.5 text-center text-xs font-semibold text-emerald-500">
                   {lead.valor_consulta > 0 ? formatarMoeda(lead.valor_consulta) : '—'}
                 </td>
                 <td className="px-3 py-2.5">
-                  <div className={cn('w-2 h-2 rounded-full', {
+                  <div className={cn('w-2 h-2 rounded-full mx-auto', {
                     'bg-green-500':                 slaStatus === 'ok',
                     'bg-yellow-500':                slaStatus === 'atencao',
                     'bg-red-500 animate-sla-pulse': slaStatus === 'atrasado',
                   })} />
                 </td>
-                <td className="px-3 py-2.5 text-xs text-muted-foreground">{formatarData(lead.data_entrada)}</td>
+                <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">{formatarData(lead.data_entrada)}</td>
                 <td className="px-3 py-2.5">
                   {lead.chatwoot_url && (
                     <a
                       href={lead.chatwoot_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-1 text-xs text-primary hover:underline"
+                      className="flex items-center justify-center gap-1 text-xs text-primary hover:underline"
                       onClick={e => e.stopPropagation()}
                     >
                       <ExternalLink className="h-3 w-3" />

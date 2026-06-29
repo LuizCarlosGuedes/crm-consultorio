@@ -6,7 +6,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Stage, Lead } from '@/lib/types';
 import { KanbanCard } from './KanbanCard';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
-import { cn } from '@/lib/utils';
+import { cn, calcSLAStatus } from '@/lib/utils';
 
 interface KanbanColumnProps {
   stage: Stage;
@@ -19,18 +19,15 @@ interface KanbanColumnProps {
 export function KanbanColumn({ stage, leads, onCardClick, onPacienteConsultou, onQuickNota }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
 
-  const slaAtrasados = leads.filter(l => {
-    if (!l.sla_vencimento) return false;
-    return new Date(l.sla_vencimento).getTime() < Date.now();
-  }).length;
+  // Conta só os que realmente piscam no card (respeita "Eu cuido" e etapas terminais).
+  const slaAtrasados = leads.filter(l => calcSLAStatus(l) === 'atrasado').length;
 
   return (
     <div className="flex flex-col flex-shrink-0 w-[280px]">
       {/* ── Column header ─────────────────────────────── */}
       <div
-        className="flex items-center justify-between px-3 py-2 rounded-t-lg"
+        className="hdr-navy flex items-center justify-between px-3 py-2 rounded-t-lg"
         style={{
-          backgroundColor: '#0b1a35',
           borderTop:   `6px solid ${stage.corHex}`,
           borderLeft:  `1px solid ${stage.corHex}55`,
           borderRight: `1px solid ${stage.corHex}55`,
@@ -77,11 +74,12 @@ export function KanbanColumn({ stage, leads, onCardClick, onPacienteConsultou, o
         ref={setNodeRef}
         className={cn(
           'flex-1 overflow-y-auto rounded-b-lg border border-t-0 transition-colors duration-150',
-          'min-h-[100px] max-h-[calc(100vh-180px)]'
+          'min-h-[120px] max-h-[calc(100vh-180px)]'
         )}
         style={{
-          backgroundColor: isOver ? '#c2a65012' : '#f7f6f408',
-          borderColor:     isOver ? '#c2a65060' : '#e0e0e040',
+          backgroundColor: isOver ? '#c2a65018' : 'rgba(63,78,104,0.08)',
+          borderColor:     isOver ? '#c2a65066' : 'rgba(63,78,104,0.18)',
+          boxShadow:       'inset 0 3px 10px -6px rgba(11,26,53,0.18)',
         }}
       >
         <SortableContext

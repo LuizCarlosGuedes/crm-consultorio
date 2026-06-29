@@ -3,17 +3,18 @@
 import React, { useState } from 'react';
 import {
   DndContext,
+  closestCorners,
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
-  MouseSensor,
-  TouchSensor,
+  PointerSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { Lead, Stage } from '@/lib/types';
+import { Lead, Stage, Pendencia } from '@/lib/types';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanCard } from './KanbanCard';
+import { PendenciaColumn } from './PendenciaColumn';
 
 interface KanbanBoardProps {
   stages: Stage[];
@@ -22,16 +23,17 @@ interface KanbanBoardProps {
   onCardClick: (lead: Lead) => void;
   onPacienteConsultou?: (lead: Lead) => Promise<void>;
   onQuickNota?: (lead: Lead, nota: string) => Promise<void>;
+  pendencias?: Pendencia[];
+  onResolvePendencia?: (id: string) => void;
 }
 
-export function KanbanBoard({ stages, leads, onMoveCard, onCardClick, onPacienteConsultou, onQuickNota }: KanbanBoardProps) {
+export function KanbanBoard({ stages, leads, onMoveCard, onCardClick, onPacienteConsultou, onQuickNota, pendencias, onResolvePendencia }: KanbanBoardProps) {
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
 
   const sensors = useSensors(
-    // Mouse (desktop): arrasta após mover 8px.
-    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
-    // Toque (tablet/celular): segura 200ms para arrastar — assim o swipe rola as colunas e o segurar move o card.
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } })
+    // PointerSensor cobre mouse E toque (pointer events) — bem mais confiável no tablet/celular.
+    // Arrasta pela alça ⠿ (touch-action:none) após mover 8px. O corpo do card continua clicável/rolável.
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -67,20 +69,30 @@ export function KanbanBoard({ stages, leads, onMoveCard, onCardClick, onPaciente
   return (
     <DndContext
       sensors={sensors}
+      collisionDetection={closestCorners}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-3 overflow-x-auto pb-4 px-1">
-        {stages.map(stage => (
-          <KanbanColumn
-            key={stage.id}
-            stage={stage}
-            leads={leads.filter(l => l.etapa_atual === stage.id)}
-            onCardClick={onCardClick}
-            onPacienteConsultou={onPacienteConsultou}
-            onQuickNota={onQuickNota}
-          />
-        ))}
+        {stages.map(stage =>
+          stage.id === 'Pendência' ? (
+            <PendenciaColumn
+              key={stage.id}
+              stage={stage}
+              pendencias={pendencias ?? []}
+              onResolved={onResolvePendencia ?? (() => {})}
+            />
+          ) : (
+            <KanbanColumn
+              key={stage.id}
+              stage={stage}
+              leads={leads.filter(l => l.etapa_atual === stage.id)}
+              onCardClick={onCardClick}
+              onPacienteConsultou={onPacienteConsultou}
+              onQuickNota={onQuickNota}
+            />
+          )
+        )}
       </div>
 
       <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>

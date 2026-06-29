@@ -7,7 +7,8 @@ import { ExternalLink, Phone, Tag, Stethoscope, Loader2, Pencil, Save } from 'lu
 import { Lead } from '@/lib/types';
 import {
   calcSLAStatus, formatarTempoRelativo, formatarMoeda,
-  getOrigemIcon, calcularIdade, formatarTag, getEtapa, diasNaEtapa, cn,
+  getOrigemIcon, formatarTag, getEtapa, diasNaEtapa, cn,
+  isSLAPausado, isComercial, ehTagInterna,
 } from '@/lib/utils';
 
 interface KanbanCardProps {
@@ -19,6 +20,11 @@ interface KanbanCardProps {
 }
 
 const ETAPAS_COM_BOTAO_CONSULTOU = new Set(['Agendado', 'Sinal Pago']);
+
+// O aviso "A pagar" só faz sentido quando há consulta MARCADA e ainda não paga: as colunas de
+// agendamento. Em qualquer outra (Proposta, Follow-up, No Show, etc.) o paciente não "deve" o
+// valor — mostrar "A pagar R$X" ali seria errado. "Pago"/"Sinal" (dinheiro real) aparecem sempre.
+const ETAPAS_COM_APAGAR = new Set(['Agendado', 'Retorno Agendado']);
 
 const PRIORIDADE_LABEL: Record<string, string> = {
   urgente: 'URGENTE',
@@ -50,25 +56,25 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onQu
     !!onPacienteConsultou;
 
   const slaStatus = calcSLAStatus(lead);
+  const slaPausado = isSLAPausado(lead);
+  const comercial = isComercial(lead);
   const etapa     = getEtapa(lead.etapa_atual);
-  const idade     = calcularIdade(lead.data_nascimento);
   const dias      = diasNaEtapa(lead);
+  const slaLabel  =
+    slaStatus === 'atrasado' ? 'SLA vencido — o lead passou do prazo desta etapa'
+    : slaStatus === 'atencao'  ? 'SLA quase vencendo — faltam menos de 20% do prazo da etapa'
+    : 'SLA dentro do prazo';
 
   const style = {
     transform:  CSS.Transform.toString(transform),
     transition,
     borderLeft: `4px solid ${etapa?.corHex ?? '#3f4e68'}`,
+    // toque: card segue o dedo em qualquer direção (sem o navegador roubar o gesto p/ rolagem).
+    touchAction: 'none' as const,
   };
 
-  const infoDataPessoal = [
-    idade !== null ? `${idade} anos` : null,
-    lead.sexo
-      ? (lead.sexo === 'M' ? 'Masc.' : lead.sexo === 'F' ? 'Fem.' : lead.sexo)
-      : null,
-    lead.estado_civil ?? null,
-  ].filter(Boolean).join(' · ');
-
-  const tagsMostrar = (lead.tags ?? []).slice(0, 3);
+  const tagsVisiveis = (lead.tags ?? []).filter(t => !ehTagInterna(t));
+  const tagsMostrar = tagsVisiveis.slice(0, 3);
 
   function handlePencilClick(e: React.MouseEvent) {
     e.stopPropagation();
@@ -106,8 +112,8 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onQu
       {...attributes}
       {...listeners}
       className={cn(
-        'group relative rounded-lg cursor-pointer select-none transition-all duration-150',
-        'bg-white dark:bg-card',
+        'group relative rounded-lg cursor-grab active:cursor-grabbing select-none transition-all duration-150',
+        'bg-card',
         'border border-brand-gray/60 dark:border-[#3f4e68]',
         'hover:shadow-md hover:border-brand-gold/60',
         isDragging && 'opacity-40',
@@ -150,9 +156,13 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onQu
           <span className="text-[11px] font-mono text-muted-foreground">{lead.telefone}</span>
         </div>
 
-        {/* ── Dados pessoais ───────────────────────────── */}
-        {infoDataPessoal && (
-          <p className="text-[10px] text-muted-foreground">🎂 {infoDataPessoal}</p>
+        {/* ── Comercial (não-paciente) ─────────────────── */}
+        {comercial && (
+          <div>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold rounded px-1.5 py-0.5 leading-none bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/40">
+              🏢 Comercial
+            </span>
+          </div>
         )}
 
         {/* ── Tags clínicas ────────────────────────────── */}
@@ -167,31 +177,46 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onQu
                 {formatarTag(t)}
               </span>
             ))}
-            {(lead.tags?.length ?? 0) > 3 && (
+            {tagsVisiveis.length > 3 && (
               <span className="text-[9px] text-muted-foreground">
-                +{(lead.tags?.length ?? 0) - 3}
+                +{tagsVisiveis.length - 3}
               </span>
             )}
           </div>
         )}
 
-        {/* ── Total investido ──────────────────────────── */}
-        {(lead.total_investido ?? 0) > 0 && (
-          <p className="text-[10px] font-semibold text-brand-gold">
-            💰 Investido: {formatarMoeda(lead.total_investido ?? 0)}
+        {/* ── Pagamento (status) ──────────────────────────── */}
+        {(() => {
+          const valor = lead.valor_consulta ?? 0;
+          const pago = lead.total_investido ?? 0;
+          // "A pagar" só nas colunas de agendamento; "Pago"/"Sinal" (dinheiro real) sempre.
+          const podeApagar = ETAPAS_COM_APAGAR.has(lead.etapa_atual);
+          let label: string; let cls: string;
+          if (valor > 0 && pago >= valor) { label = `Pago · ${formatarMoeda(pago)}`; cls = 'bg-emerald-600 text-white border-emerald-700'; }
+          else if (pago > 0) { label = valor > 0 ? `Sinal · ${formatarMoeda(pago)} de ${formatarMoeda(valor)}` : `Recebido · ${formatarMoeda(pago)}`; cls = 'bg-amber-500 text-white border-amber-600'; }
+          else if (valor > 0 && podeApagar) { label = `A pagar · ${formatarMoeda(valor)}`; cls = 'bg-red-600 text-white border-red-700'; }
+          else return null;
+          return <p className={`text-[10px] font-semibold inline-flex items-center gap-1 px-1.5 py-0.5 rounded border ${cls}`}>💰 {label}</p>;
+        })()}
+
+        {/* ── Agendamento (dia/hora, sincronizado com o Google) ──────── */}
+        {lead.agendamento && (
+          <p className="text-[10.5px] font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-600 text-white border border-blue-700">
+            📅 {lead.agendamento.data_br} · {lead.agendamento.hora_br}
+            {lead.agendamento.tipo === 'retorno' ? ' · retorno' : lead.agendamento.tipo === 'procedimento' ? ' · procedimento' : ''}
           </p>
         )}
 
         {/* ── Nota ─────────────────────────────────────── */}
         {lead.nota && !notaOpen && (
-          <p className="text-[10px] italic line-clamp-2 text-muted-foreground bg-brand-cream/60 dark:bg-brand-slate/10 border border-brand-gray/30 rounded px-1.5 py-1">
+          <p className="text-[10.5px] italic line-clamp-2 text-foreground/80 bg-brand-cream dark:bg-brand-slate/15 border border-brand-gold/25 rounded px-1.5 py-1">
             💬 {lead.nota}
           </p>
         )}
 
         {/* ── Última mensagem ──────────────────────────── */}
         {lead.ultima_mensagem && !notaOpen && (
-          <p className="text-[10px] line-clamp-1 text-muted-foreground bg-blue-50/60 dark:bg-blue-900/10 border border-blue-200/40 dark:border-blue-700/30 rounded px-1.5 py-1">
+          <p className="text-[10.5px] line-clamp-1 text-foreground/80 bg-blue-50 dark:bg-blue-900/15 border border-blue-300/50 dark:border-blue-700/30 rounded px-1.5 py-1">
             📱 {lead.ultima_mensagem}
           </p>
         )}
@@ -234,22 +259,29 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onQu
         {/* ── Footer: tempo + dias + SLA + ações ───────── */}
         <div className="flex items-center justify-between pt-1 border-t border-brand-gray/40 dark:border-[#3f4e68]/40">
           <div className="flex items-center gap-1.5">
-            <div className={cn('w-2 h-2 rounded-full flex-shrink-0', {
-              'bg-emerald-500':               slaStatus === 'ok',
-              'bg-yellow-500':                slaStatus === 'atencao',
-              'bg-red-500 animate-sla-pulse': slaStatus === 'atrasado',
+            <div title={slaPausado ? 'SLA pausado — o Dr está conduzindo este caso' : slaLabel} className={cn('w-2 h-2 rounded-full flex-shrink-0', {
+              'bg-slate-400':                 slaPausado,
+              'bg-emerald-500':               !slaPausado && slaStatus === 'ok',
+              'bg-yellow-500':                !slaPausado && slaStatus === 'atencao',
+              'bg-red-500 animate-sla-pulse': !slaPausado && slaStatus === 'atrasado',
             })} />
-            <span className="text-[10px] text-muted-foreground">
+            <span title="Tempo desde que o lead entrou no CRM" className="text-[10px] text-muted-foreground">
               {formatarTempoRelativo(lead.data_entrada)}
             </span>
-            {slaStatus === 'atrasado' && (
+            {slaPausado && (
+              <span title="O Dr está conduzindo — SLA pausado" className="text-[9px] font-bold text-slate-300 bg-slate-500/25 border border-slate-400/30 rounded px-1">⏸ Eu cuido</span>
+            )}
+            {!slaPausado && slaStatus === 'atrasado' && (
               <span className="text-[9px] font-black text-brand-gold animate-sla-pulse">SLA!</span>
             )}
-            {slaStatus === 'atencao' && (
+            {!slaPausado && slaStatus === 'atencao' && (
               <span className="text-[9px] font-bold text-yellow-500">⚠️</span>
             )}
-            {/* Dias na etapa atual */}
-            <span className="text-[9px] text-muted-foreground/60">
+            {/* Dias parado na etapa atual */}
+            <span
+              title={dias === 0 ? 'Entrou nesta etapa hoje' : `Parado nesta etapa há ${dias} dia(s)`}
+              className="text-[9px] text-muted-foreground/60"
+            >
               {dias === 0 ? 'hoje' : `há ${dias}d`}
             </span>
           </div>

@@ -3,120 +3,161 @@
 @tailwind utilities;
 
 /*
-  Paleta da marca Dr. Luiz Guedes
-  #252223 → quase preto     → HSL 345 4% 14%
-  #0b1a35 → azul marinho    → HSL 219 66% 13%
-  #3f4e68 → azul acinzentado→ HSL 218 25% 33%
-  #c2a650 → dourado         → HSL  45 48% 54%
-  #e0e0e0 → cinza claro     → HSL   0  0% 88%
-  #f7f6f4 → off-white       → HSL  40 16% 96%
+  Paleta da marca Dr. Luiz Guedes — tema "Premium Clínico"
+  #0b1a35 marinho · #c2a650 dourado · #3f4e68 slate · #f7f6f4 cream · #252223 quase-preto
 */
 
 @layer base {
-  /* ── MODO CLARO (padrão) ───────────────────────────── */
+  /* ── MODO CLARO ───────────────────────────── */
   :root {
-    --background:            40 16% 96%;   /* #f7f6f4 off-white conteúdo */
-    --foreground:           345  4% 14%;   /* #252223 quase preto */
+    --background:            42 30% 94%;   /* cream mais quente (contraste com card branco) */
+    --foreground:           219 55% 11%;   /* texto marinho profundo (mais premium que preto) */
 
-    --card:                   0  0% 100%;  /* branco puro nos cards */
-    --card-foreground:       345  4% 14%;
+    --card:                   0  0% 100%;
+    --card-foreground:       219 55% 11%;
 
     --popover:                0  0% 100%;
-    --popover-foreground:    345  4% 14%;
+    --popover-foreground:    219 55% 11%;
 
-    --primary:               45 48% 54%;   /* #c2a650 dourado */
-    --primary-foreground:   219 66% 13%;   /* #0b1a35 marinho sobre dourado */
+    --primary:               45 52% 52%;   /* dourado */
+    --primary-foreground:   219 66% 13%;
 
-    --secondary:            218 25% 33%;   /* #3f4e68 azul acinzentado */
-    --secondary-foreground:  40 16% 96%;   /* cream no hover do secundário */
+    --secondary:            218 30% 30%;
+    --secondary-foreground:  40 20% 96%;
 
-    --muted:                 40 10% 92%;   /* quase branco quente */
-    --muted-foreground:     218 25% 33%;   /* #3f4e68 texto secundário */
+    --muted:                 42 18% 88%;
+    --muted-foreground:     218 30% 30%;   /* mais escuro = mais legível/contraste */
 
-    --accent:                40 10% 90%;   /* hover suave */
-    --accent-foreground:    345  4% 14%;
+    --accent:                42 22% 86%;
+    --accent-foreground:    219 55% 11%;
 
     --destructive:            0 84% 60%;
     --destructive-foreground: 0  0% 98%;
 
-    --border:                 0  0% 88%;   /* #e0e0e0 divisores */
-    --input:                  0  0% 88%;
-    --ring:                  45 48% 54%;   /* dourado no focus ring */
-    --radius:                 0.5rem;
+    --border:                40 16% 79%;   /* bordas mais definidas */
+    --input:                 40 16% 79%;
+    --ring:                  45 52% 52%;
+    --radius:                0.9rem;        /* cantos bem mais suaves */
   }
 
-  /* ── MODO ESCURO ───────────────────────────────────── */
+  /* ── MODO ESCURO ──────────────────────────── */
   .dark {
-    --background:           345  4% 14%;   /* #252223 fundo principal escuro */
-    --foreground:            40 16% 96%;   /* #f7f6f4 texto claro */
+    --background:           222 50%  7%;    /* navy quase-preto profundo */
+    --foreground:            40 24% 96%;
 
-    --card:                 219 66% 13%;   /* #0b1a35 painéis/cards marinho */
-    --card-foreground:        0  0% 88%;   /* #e0e0e0 */
+    --card:                 219 55% 12%;    /* card marinho */
+    --card-foreground:       40 20% 94%;
 
-    --popover:              219 66% 13%;
-    --popover-foreground:     0  0% 88%;
+    --popover:              219 55% 12%;
+    --popover-foreground:    40 20% 94%;
 
-    --primary:               45 48% 54%;   /* dourado mantido */
-    --primary-foreground:   219 66% 13%;   /* marinho */
+    --primary:               45 55% 56%;
+    --primary-foreground:   219 66% 10%;
 
-    --secondary:            218 25% 33%;   /* #3f4e68 */
-    --secondary-foreground:   0  0% 88%;
+    --secondary:            218 28% 30%;
+    --secondary-foreground:  40 20% 94%;
 
-    --muted:                218 25% 20%;   /* azul-cinza escuro */
-    --muted-foreground:       0  0% 75%;   /* cinza claro */
+    --muted:                218 30% 18%;
+    --muted-foreground:      40 12% 72%;
 
-    --accent:               218 25% 22%;
-    --accent-foreground:      0  0% 88%;
+    --accent:               218 30% 20%;
+    --accent-foreground:     40 20% 94%;
 
-    --destructive:            0 63% 40%;
+    --destructive:            0 63% 45%;
     --destructive-foreground: 0  0% 98%;
 
-    --border:               218 25% 22%;   /* borda escura azul-cinza */
-    --input:                218 25% 22%;
-    --ring:                  45 48% 54%;   /* dourado no focus */
+    --border:               218 28% 20%;
+    --input:                218 28% 20%;
+    --ring:                  45 55% 56%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
+  html, body { min-height: 100%; }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    /* Fundo com PROFUNDIDADE real */
+    background:
+      radial-gradient(900px 600px at 88% -10%, hsl(45 62% 54% / 0.28), transparent 55%),
+      radial-gradient(820px 600px at -8% 110%, hsl(218 50% 44% / 0.24), transparent 60%),
+      linear-gradient(165deg, hsl(42 32% 90%) 0%, hsl(40 22% 95%) 55%, hsl(42 28% 91%) 100%);
+    background-attachment: fixed;
+  }
+  .dark body {
+    background:
+      radial-gradient(820px 560px at 85% -8%, hsl(45 60% 56% / 0.16), transparent 52%),
+      radial-gradient(820px 620px at -6% 112%, hsl(219 70% 36% / 0.40), transparent 60%),
+      linear-gradient(165deg, hsl(222 52% 8%) 0%, hsl(220 48% 6%) 60%, hsl(222 50% 9%) 100%);
+    background-attachment: fixed;
   }
 }
 
-/* ── Scrollbar ──────────────────────────────────────── */
-::-webkit-scrollbar        { width: 5px; height: 5px; }
-::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  {
-  background-color: #3f4e68;
-  border-radius: 9999px;
-  opacity: 0.6;
+/* ── Elevação premium: TODO card ganha relevo ── */
+/* ── SUPERFÍCIE PREMIUM ÚNICA — todo card do CRM usa isto ── */
+.bg-card {
+  background-color: hsl(0 0% 100% / 0.97);
+  box-shadow:
+    0 1px 2px hsl(219 50% 14% / 0.06),
+    0 10px 24px -12px hsl(219 55% 14% / 0.22),
+    0 3px 8px -4px hsl(219 55% 14% / 0.12);
 }
+.dark .bg-card {
+  background-color: hsl(219 44% 16%);
+  box-shadow:
+    0 12px 30px -14px rgba(0,0,0,0.72),
+    0 3px 10px -4px rgba(0,0,0,0.5),
+    inset 0 1px 0 hsl(45 52% 52% / 0.16);
+}
+
+/* ── Superfície marinho (cabeçalhos): theme-aware — clareia no escuro pra destacar do fundo ── */
+.hdr-navy       { background-color: #0b1a35; }
+.dark .hdr-navy { background-color: #1b3360; }
+.hdr-navy-grad       { background: linear-gradient(135deg, #0b1a35 0%, #1c3055 100%); }
+.dark .hdr-navy-grad { background: linear-gradient(135deg, #18305a 0%, #27457f 100%); }
+
+/* ── Vidro (glassmorphism) ── */
+.glass {
+  background: hsl(var(--card) / 0.72);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border: 1px solid hsl(var(--border) / 0.55);
+  box-shadow: 0 10px 34px -16px hsl(219 60% 13% / 0.28);
+}
+.dark .glass {
+  background: hsl(219 55% 12% / 0.62);
+  border: 1px solid hsl(45 52% 52% / 0.14);
+  box-shadow: 0 14px 40px -18px rgba(0,0,0,0.7);
+}
+
+/* ── Popup do card (LeadModal): X de fechar claro sobre o header marinho ── */
+.lead-modal > button { color: #f7f6f4; opacity: 0.85; }
+.lead-modal > button:hover { opacity: 1; }
+
+/* ── Assinatura dourada ── */
+.gold-top { position: relative; }
+.gold-top::before {
+  content: ''; position: absolute; top: 0; left: 12%; right: 12%; height: 2px; border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, hsl(45 52% 52% / 0.9), transparent);
+}
+.gold-glow { box-shadow: 0 0 0 1px hsl(45 52% 52% / 0.25), 0 8px 30px -10px hsl(45 52% 52% / 0.35); }
+.text-gold { color: #c2a650; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background-color: #3f4e68; border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background-color: #c2a650; }
 
-/* ── Animação SLA vencido ───────────────────────────── */
-@keyframes sla-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.35; }
-}
-.animate-sla-pulse {
-  animation: sla-pulse 1s ease-in-out infinite;
-}
+/* ── Animações ── */
+@keyframes sla-pulse { 0%,100%{opacity:1;} 50%{opacity:.35;} }
+.animate-sla-pulse { animation: sla-pulse 1s ease-in-out infinite; }
 
-/* ── Card urgente — brilho dourado ─────────────────── */
 @keyframes urgente-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(194, 166, 80, 0); }
-  50%       { box-shadow: 0 0 0 4px rgba(194, 166, 80, 0.35); }
+  0%,100% { box-shadow: 0 0 0 0 rgba(194,166,80,0); }
+  50%     { box-shadow: 0 0 0 4px rgba(194,166,80,0.35); }
 }
-.animate-urgente {
-  animation: urgente-pulse 1.2s ease-in-out infinite;
-}
+.animate-urgente { animation: urgente-pulse 1.2s ease-in-out infinite; }
 
-/* ── Drag overlay ───────────────────────────────────── */
-.drag-overlay {
-  box-shadow: 0 20px 40px rgba(11, 26, 53, 0.5);
-  transform: rotate(2deg);
-}
+.drag-overlay { box-shadow: 0 24px 48px rgba(11,26,53,0.55); transform: rotate(2deg); }

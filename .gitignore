@@ -1,3 +1,7 @@
 node_modules/  
 .next/  
 .env.local 
+
+# dados de paciente / config de ferramentas - nunca commitar
+backup_cards_teste.json
+.claude/

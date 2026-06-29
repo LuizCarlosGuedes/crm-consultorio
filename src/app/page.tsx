@@ -12,13 +12,19 @@ import { AddLeadModal } from '@/components/AddLeadModal';
 import { PendenciasView } from '@/components/PendenciasView';
 import { RetornosView } from '@/components/RetornosView';
 import { DescadastradosView } from '@/components/DescadastradosView';
+import { ProcedimentosView, Procedimento } from '@/components/ProcedimentosView';
+import { ConteudoView, Conteudo } from '@/components/ConteudoView';
+import { AgendaView } from '@/components/AgendaView';
+import { ReativacaoView } from '@/components/ReativacaoView';
 import { Header, ActiveTab, ViewMode } from '@/components/Header';
+import { Sidebar } from '@/components/Sidebar';
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
   const [activeTab, setActiveTab]       = useState<ActiveTab>('pipeline1');
   const [viewMode,  setViewMode]        = useState<ViewMode>('kanban');
   const [leads,     setLeads]           = useState<Lead[]>([]);
+  const [agendaMap, setAgendaMap]       = useState<Record<string, { data_br: string; hora_br: string; tipo: string }>>({});
   const [loading,   setLoading]         = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -31,7 +37,10 @@ export default function Home() {
   const [retornosLoading, setRetornosLoading] = useState(false);
   const [descadastrados, setDescadastrados] = useState<Descadastrado[]>([]);
   const [descadastradosLoading, setDescadastradosLoading] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
+  const [procedimentosLoading, setProcedimentosLoading] = useState(false);
+  const [conteudos, setConteudos] = useState<Conteudo[]>([]);
+  const [conteudosLoading, setConteudosLoading] = useState(false);
 
   const fetchLeads = useCallback(async () => {
     const { data, error } = await supabase
@@ -40,6 +49,16 @@ export default function Home() {
       .order('data_entrada', { ascending: false });
     if (!error && data) setLeads(data as Lead[]);
     setLoading(false);
+    // Próximos agendamentos (clinica_ia, sincronizado com Google) → mostra dia/hora no card.
+    try {
+      const r = await fetch('/api/agendamentos', { cache: 'no-store' });
+      const j = await r.json();
+      const m: Record<string, { data_br: string; hora_br: string; tipo: string }> = {};
+      for (const a of (j.agendamentos ?? [])) {
+        if (a?.tel8) m[a.tel8] = { data_br: a.data_br, hora_br: a.hora_br, tipo: a.tipo };
+      }
+      setAgendaMap(m);
+    } catch { /* sem agendamentos */ }
   }, []);
 
   const fetchPendencias = useCallback(async () => {
@@ -76,11 +95,33 @@ export default function Home() {
     }
   }, []);
 
+  const fetchProcedimentos = useCallback(async () => {
+    setProcedimentosLoading(true);
+    try {
+      const res = await fetch('/api/procedimentos');
+      if (res.ok) setProcedimentos(await res.json() as Procedimento[]);
+    } finally {
+      setProcedimentosLoading(false);
+    }
+  }, []);
+
+  const fetchConteudos = useCallback(async () => {
+    setConteudosLoading(true);
+    try {
+      const res = await fetch('/api/conteudo');
+      if (res.ok) setConteudos(await res.json() as Conteudo[]);
+    } finally {
+      setConteudosLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchLeads();
     fetchPendencias();
     fetchRetornos();
     fetchDescadastrados();
+    fetchProcedimentos();
+    fetchConteudos();
 
     const leadsChannel = supabase
       .channel('leads-realtime')
@@ -102,15 +143,7 @@ export default function Home() {
       supabase.removeChannel(pendenciasChannel);
       supabase.removeChannel(retornosChannel);
     };
-  }, [fetchLeads, fetchPendencias, fetchRetornos, fetchDescadastrados]);
-
-  // Detecta tela pequena para forçar a visão em LISTA (Kanban horizontal não serve no celular).
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
+  }, [fetchLeads, fetchPendencias, fetchRetornos, fetchDescadastrados, fetchProcedimentos, fetchConteudos]);
 
   // Reset filtro de etapa ao trocar de pipeline
   function handleTabChange(tab: ActiveTab) {
@@ -155,6 +188,23 @@ export default function Home() {
     }
   }
 
+  // Move o card para QUALQUER pipeline + coluna (P1↔P2). Passa pela rota PUT,
+  // que sincroniza pacientes.etapa_crm via o bridge (os fluxos acompanham sozinhos).
+  async function handleTransferCard(leadId: string, pipelineId: 1 | 2, etapa: string) {
+    setLeads(prev =>
+      prev.map(l => l.id === leadId ? { ...l, pipeline_id: pipelineId, etapa_atual: etapa, movido_por_ia: false } : l)
+    );
+    const res = await fetch(`/api/leads/${leadId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pipeline_id: pipelineId, etapa_atual: etapa, movido_por: 'humano' }),
+    });
+    if (!res.ok) fetchLeads();
+    if (selectedLead?.id === leadId) {
+      setSelectedLead(prev => prev ? { ...prev, pipeline_id: pipelineId, etapa_atual: etapa } : null);
+    }
+  }
+
   async function handleUpdateLead(id: string, data: Partial<Lead>) {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...data } : l));
 
@@ -183,6 +233,16 @@ export default function Home() {
     await fetch(`/api/leads/${lead.id}`, { method: 'DELETE' });
   }
 
+  async function handleDescadastrar(lead: Lead, modo: 'sair' | 'apagar') {
+    setLeads(prev => prev.filter(l => l.id !== lead.id));
+    await fetch(`/api/leads/${lead.id}/descadastrar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modo }),
+    });
+    fetchDescadastrados();
+  }
+
   async function handleQuickNota(lead: Lead, nota: string) {
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, nota } : l));
     await fetch(`/api/leads/${lead.id}`, {
@@ -196,59 +256,21 @@ export default function Home() {
   }
 
   async function handlePacienteConsultou(lead: Lead) {
-    // 1. Cria novo card no Pipeline 2 na etapa Compareceu
-    console.log('[PacienteConsultou] Dados do lead antes do POST:', {
-      nome: lead.nome, telefone: lead.telefone, email: lead.email,
-      cpf: lead.cpf, rg: lead.rg, data_nascimento: lead.data_nascimento,
-      sexo: lead.sexo, genero: lead.genero, idade: lead.idade,
-      estado_civil: lead.estado_civil, profissao: lead.profissao,
-      endereco: lead.endereco, numero: lead.numero, complemento: lead.complemento,
-      bairro: lead.bairro, cidade: lead.cidade, estado: lead.estado, cep: lead.cep,
-      origem: lead.origem, prioridade: lead.prioridade, nota: lead.nota,
-      tags: lead.tags, chatwoot_url: lead.chatwoot_url,
-    });
-    await fetch('/api/leads', {
-      method: 'POST',
+    // Move o MESMO card para o Pipeline 2 / "Compareceu" (update-in-place).
+    // Mantém o id do card → o vínculo pacientes.crm_card_id continua válido, o histórico
+    // segue contínuo e a rota PUT já dispara o bridge crm-sync-etapa (etapa_crm='Compareceu').
+    setLeads(prev =>
+      prev.map(l => l.id === lead.id ? { ...l, pipeline_id: 2, etapa_atual: 'Compareceu', movido_por_ia: false } : l)
+    );
+
+    const res = await fetch(`/api/leads/${lead.id}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        // Identificação
-        nome:           lead.nome,
-        telefone:       lead.telefone,
-        email:          lead.email,
-        cpf:            lead.cpf,
-        rg:             lead.rg,
-        // Dados pessoais
-        data_nascimento: lead.data_nascimento,
-        sexo:           lead.sexo,
-        genero:         lead.genero,
-        idade:          lead.idade,
-        estado_civil:   lead.estado_civil,
-        profissao:      lead.profissao,
-        // Endereço
-        endereco:       lead.endereco,
-        numero:         lead.numero,
-        complemento:    lead.complemento,
-        bairro:         lead.bairro,
-        cidade:         lead.cidade,
-        estado:         lead.estado,
-        cep:            lead.cep,
-        // CRM
-        origem:         lead.origem,
-        procedimento:   lead.procedimento,
-        prioridade:     lead.prioridade,
-        nota:           lead.nota,
-        tags:           lead.tags,
-        chatwoot_url:   lead.chatwoot_url,
-        pipeline_id:    2,
-        etapa_atual:    'Compareceu',
-        movido_por:     'humano',
-      }),
+      body: JSON.stringify({ pipeline_id: 2, etapa_atual: 'Compareceu', movido_por: 'humano' }),
     });
+    if (!res.ok) { fetchLeads(); return; }
 
-    // 2. Remove o card original do Pipeline 1
-    await fetch(`/api/leads/${lead.id}`, { method: 'DELETE' });
-
-    // 3. Dispara webhook N8N
+    // Webhook da clínica: marca compareceu_at + consulta REALIZADO (WF12) e abre o pós-consulta.
     fetch('https://n8n.drluizguedes.com.br/webhook/paciente-consultou', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -273,16 +295,25 @@ export default function Home() {
 
   const activePipeline = activeTab === 'pipeline2' ? 2 : 1;
   const activeStages   = activeTab === 'pipeline2' ? PIPELINE_2 : PIPELINE_1;
-  const leadsP1        = filtrarLeads(leads, 1);
-  const leadsP2        = filtrarLeads(leads, 2);
+  const leadsComAgenda = leads.map(l => {
+    const t8 = (l.telefone || '').replace(/\D/g, '').slice(-8);
+    return { ...l, agendamento: (t8 && agendaMap[t8]) || null };
+  });
+  const leadsP1        = filtrarLeads(leadsComAgenda, 1);
+  const leadsP2        = filtrarLeads(leadsComAgenda, 2);
   const filteredLeads  = activePipeline === 2 ? leadsP2 : leadsP1;
 
   const showFilterBar = activeTab === 'pipeline1' || activeTab === 'pipeline2';
   const headerH       = showFilterBar ? 101 : 53;
-  const effectiveView: ViewMode = isMobile ? 'lista' : viewMode;
+  const effectiveView: ViewMode = viewMode; // mobile/tablet usam o kanban (colunas) igual ao desktop
 
   return (
     <div className="min-h-screen bg-background">
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        pendenciasCount={pendencias.length}
+      />
       <Header
         activeTab={activeTab}
         onTabChange={handleTabChange}
@@ -301,8 +332,8 @@ export default function Home() {
       />
 
       <main
-        className="pl-0 overflow-hidden"
-        style={{ paddingTop: `${headerH}px` }}
+        className="overflow-hidden"
+        style={{ paddingTop: `${headerH}px`, paddingLeft: 60 }}
       >
         {loading && (activeTab === 'pipeline1' || activeTab === 'pipeline2') ? (
           <div className="flex items-center justify-center h-64">
@@ -328,6 +359,8 @@ export default function Home() {
                   onCardClick={setSelectedLead}
                   onPacienteConsultou={handlePacienteConsultou}
                   onQuickNota={handleQuickNota}
+                  pendencias={pendencias}
+                  onResolvePendencia={handleResolvePendencia}
                 />
               </div>
             )}
@@ -359,6 +392,30 @@ export default function Home() {
                 </p>
                 <ListView leads={leadsP2} onCardClick={setSelectedLead} />
               </div>
+            )}
+
+            {/* Procedimentos */}
+            {activeTab === 'procedimentos' && (
+              <ProcedimentosView
+                procedimentos={procedimentos}
+                loading={procedimentosLoading}
+                onRefresh={fetchProcedimentos}
+              />
+            )}
+
+            {/* Agenda */}
+            {activeTab === 'agenda' && <AgendaView />}
+
+            {/* Base de Reativação */}
+            {activeTab === 'reativacao' && <ReativacaoView />}
+
+            {/* Conteúdo */}
+            {activeTab === 'conteudo' && (
+              <ConteudoView
+                conteudos={conteudos}
+                loading={conteudosLoading}
+                onRefresh={fetchConteudos}
+              />
             )}
 
             {/* Pendências */}
@@ -397,8 +454,9 @@ export default function Home() {
         lead={selectedLead}
         onClose={() => setSelectedLead(null)}
         onUpdate={handleUpdateLead}
-        onMoveCard={handleMoveCard}
+        onTransferCard={handleTransferCard}
         onDeleteCard={handleDeleteCard}
+        onDescadastrar={handleDescadastrar}
       />
 
       <AddLeadModal

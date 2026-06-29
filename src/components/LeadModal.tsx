@@ -2,14 +2,25 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  ExternalLink, ArrowRight, Edit2, Save, Plus, X, Trash2, Loader2,
+  ExternalLink, ArrowRight, Edit2, Save, Plus, X, Trash2, Loader2, Sparkles,
 } from 'lucide-react';
 import { Lead, HistoricoMovimentacao, Nota, Financeiro } from '@/lib/types';
+import { TarefaNathaliaModal } from './TarefaNathaliaModal';
 import { supabase } from '@/lib/supabase';
 import { PIPELINE_1, PIPELINE_2, ORIGENS, PRIORIDADES, TAGS } from '@/lib/constants';
+
+// Colunas da aba Procedimentos (proc_status no clinica_ia)
+const PROC_COLS: { id: string; nome: string; corHex: string }[] = [
+  { id: 'pendente',             nome: 'Em Negociação',       corHex: '#c2a650' },
+  { id: 'aguardando_pagamento', nome: 'Aguardando Pagamento', corHex: '#F97316' },
+  { id: 'pago',                 nome: 'A Agendar',           corHex: '#06B6D4' },
+  { id: 'agendado',             nome: 'Em Tratamento',       corHex: '#10B981' },
+  { id: 'concluido',            nome: 'Concluído',           corHex: '#3f4e68' },
+];
 import {
   calcSLAStatus, formatarData, formatarMoeda, formatarTempoRelativo,
   getOrigemIcon, getEtapa, calcularIdade, formatarTag, cn,
+  isSLAPausado, TAG_EU_CUIDO, isComercial, ehTagInterna,
 } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
@@ -22,13 +33,29 @@ interface LeadModalProps {
   lead: Lead | null;
   onClose: () => void;
   onUpdate: (id: string, data: Partial<Lead>) => Promise<void>;
-  onMoveCard: (leadId: string, newStage: string) => Promise<void>;
+  onTransferCard: (leadId: string, pipelineId: 1 | 2, etapa: string) => Promise<void>;
   onDeleteCard?: (lead: Lead) => Promise<void>;
+  onDescadastrar?: (lead: Lead, modo: 'sair' | 'apagar') => Promise<void>;
 }
 
-type Section = 'detalhes' | 'perfil' | 'financeiro' | 'historico' | 'notas';
+type Section = 'detalhes' | 'perfil' | 'poscon' | 'financeiro' | 'historico' | 'notas';
 
-export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDeleteCard }: LeadModalProps) {
+interface PosData {
+  retorno_num?:           number | string | null;
+  retorno_unidade?:       string | null;
+  tem_procedimento?:      boolean | null;
+  proc_nome?:             string | null;
+  proc_sessoes?:          number | string | null;
+  proc_tempo_tratamento?: string | null;
+  proc_periodicidade?:    string | null;
+  proc_valor_cheio?:      number | string | null;
+  proc_valor_piso?:       number | string | null;
+  proc_valor_fechado?:    number | string | null;
+  proc_status?:           string | null;
+  data_retorno_previsto?: string | null;
+}
+
+export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, onDeleteCard, onDescadastrar }: LeadModalProps) {
   // Card "ao vivo": parte do prop e se atualiza sozinho enquanto o modal está aberto
   // (Supabase Realtime + polling de 10s). Evita ver dado defasado depois que o n8n grava.
   const [lead, setLead] = useState<Lead | null>(leadProp);
@@ -38,9 +65,10 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
   useEffect(() => {
     const id = leadProp?.id;
     if (!id) return;
+    let active = true;
     const refetch = async () => {
       const { data } = await supabase.from('leads').select('*').eq('id', id).single();
-      if (data) setLead(data as Lead);
+      if (data && active) setLead(data as Lead);
     };
     refetch(); // busca o estado REAL do banco imediatamente ao abrir (não espera 10s)
     const ch = supabase
@@ -48,7 +76,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads', filter: `id=eq.${id}` }, refetch)
       .subscribe();
     const poll = setInterval(refetch, 10000);
-    return () => { supabase.removeChannel(ch); clearInterval(poll); };
+    return () => { active = false; supabase.removeChannel(ch); clearInterval(poll); };
   }, [leadProp?.id]);
 
   const [isEditing,         setIsEditing]         = useState(false);
@@ -58,19 +86,60 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
   const [financeiro,        setFinanceiro]        = useState<Financeiro[]>([]);
   const [newNota,           setNewNota]           = useState('');
   const [newNotaAutor,      setNewNotaAutor]      = useState('Atendente');
+  const [newPagTipo,        setNewPagTipo]        = useState('sinal');
+  const [newPagValor,       setNewPagValor]       = useState('');
+  const [newPagDesc,        setNewPagDesc]         = useState('');
   const [loading,           setLoading]           = useState(false);
   const [activeSection,     setActiveSection]     = useState<Section>('detalhes');
-  const [confirmDelete,     setConfirmDelete]     = useState(false);
-  const [deleteLoading,     setDeleteLoading]     = useState(false);
+  const [confirmAction,     setConfirmAction]     = useState<null | 'crm' | 'tudo'>(null);
+  const [actionLoading,     setActionLoading]     = useState(false);
+  const [apagarText,        setApagarText]        = useState('');
+  const [movePipeline,      setMovePipeline]      = useState<1 | 2 | 'proc'>(1);
+  const [procForm,          setProcForm]          = useState({ nome: '', sessoes: '', periodicidade: 'semanal', valor: '' });
+  const [posData,           setPosData]           = useState<PosData>({});
+  const [posLoading,        setPosLoading]        = useState(false);
+  const [procPagoValor,     setProcPagoValor]     = useState('');
+  const [procPagoLoading,   setProcPagoLoading]   = useState(false);
+  const [cortesia,          setCortesia]          = useState(false);
+  const [cortesiaMotivo,    setCortesiaMotivo]    = useState('');
+  const [cortesiaLoading,   setCortesiaLoading]   = useState(false);
+  const [tarefaOpen,        setTarefaOpen]        = useState(false);
+
+  // Cobrança via card (texto livre → mesmo motor do Telegram)
+  const [showCob,    setShowCob]    = useState(false);
+  const [cobTexto,   setCobTexto]   = useState('');
+  const [cobLoading, setCobLoading] = useState(false);
+  const [cobResult,  setCobResult]  = useState<{ ok: boolean; msg: string } | null>(null);
+  // Pós-consulta (Pipeline 2): agendar retorno / dar alta
+  const [retData,    setRetData]    = useState('');
+  const [retHora,    setRetHora]    = useState('14:00');
+  const [retValor,   setRetValor]   = useState('');
+  const [retLoading, setRetLoading] = useState<'' | 'retorno' | 'alta'>('');
+  const [retResult,  setRetResult]  = useState<{ ok: boolean; msg: string } | null>(null);
 
   useEffect(() => {
     if (!lead) return;
     setEditData({});
     setIsEditing(false);
     setActiveSection('detalhes');
+    setMovePipeline((lead.pipeline_id ?? 1) === 2 ? 2 : 1);
     fetchHistorico(lead.id);
     fetchNotas(lead.id);
     fetchFinanceiro(lead.id);
+    fetchCortesia(lead.id, lead.telefone);
+  }, [lead?.id]);
+
+  // Dados de pós-consulta (vêm de `pacientes` via proxy n8n) — só para cards do Pipeline 2.
+  useEffect(() => {
+    if (!lead || (lead.pipeline_id ?? 1) !== 2) { setPosData({}); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/leads/${lead.id}/pos-consulta?telefone=${encodeURIComponent(lead.telefone)}`);
+        if (res.ok && !cancelled) setPosData((await res.json()) || {});
+      } catch { /* silencioso */ }
+    })();
+    return () => { cancelled = true; };
   }, [lead?.id]);
 
   async function fetchHistorico(leadId: string) {
@@ -114,12 +183,117 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
     setLoading(false);
   }
 
-  async function handleMoverPara(etapaId: string) {
+  async function handleAddFinanceiro() {
+    if (!lead) return;
+    const valorNum = parseFloat(String(newPagValor).replace(',', '.'));
+    if (!valorNum || valorNum <= 0) return;
+    setLoading(true);
+    const res = await fetch('/api/financeiro', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: lead.id, tipo: newPagTipo, descricao: newPagDesc, valor: valorNum }),
+    });
+    if (res.ok) {
+      await fetchFinanceiro(lead.id);
+      setNewPagValor('');
+      setNewPagDesc('');
+    }
+    setLoading(false);
+  }
+
+  async function handleTransferir(pid: 1 | 2, etapaId: string) {
     if (!lead) return;
     setLoading(true);
-    await onMoveCard(lead.id, etapaId);
+    await onTransferCard(lead.id, pid, etapaId);
     await fetchHistorico(lead.id);
     setLoading(false);
+  }
+
+  async function handleMoverProcedimento(status: string) {
+    if (!lead) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/procedimento`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telefone: lead.telefone,
+          proc_nome: procForm.nome.trim() || lead.procedimento || 'Procedimento',
+          proc_sessoes: procForm.sessoes ? parseInt(procForm.sessoes, 10) : null,
+          // valor BR: tira ponto de milhar, vírgula vira decimal (6.500 → 6500, 6.500,00 → 6500)
+          proc_valor: procForm.valor ? parseFloat(procForm.valor.replace(/\./g, '').replace(',', '.')) : null,
+          proc_periodicidade: procForm.periodicidade,
+          proc_status: status,
+        }),
+      });
+      // Move de verdade: configurou o procedimento no clinica_ia → remove o card do Pipeline.
+      if (res.ok) { await onDeleteCard?.(lead); onClose(); }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSavePosConsulta() {
+    if (!lead) return;
+    setPosLoading(true);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/pos-consulta`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: lead.telefone, ...posData }),
+      });
+      if (res.ok) setPosData((await res.json()) || posData);
+    } finally {
+      setPosLoading(false);
+    }
+  }
+
+  async function handleProcPago() {
+    if (!lead) return;
+    const v = parseFloat(String(procPagoValor).replace(',', '.'));
+    if (!v || v <= 0) return;
+    setProcPagoLoading(true);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/procedimento-pago`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: lead.telefone, valor: v }),
+      });
+      if (res.ok) {
+        const pc = await fetch(`/api/leads/${lead.id}/pos-consulta?telefone=${encodeURIComponent(lead.telefone)}`);
+        if (pc.ok) setPosData((await pc.json()) || {});
+        await fetchFinanceiro(lead.id);
+        setProcPagoValor('');
+      }
+    } finally {
+      setProcPagoLoading(false);
+    }
+  }
+
+  async function fetchCortesia(leadId: string, telefone: string) {
+    try {
+      const res = await fetch(`/api/leads/${leadId}/cortesia?telefone=${encodeURIComponent(telefone)}`);
+      if (res.ok) {
+        const d = await res.json();
+        setCortesia(!!d.proxima_cortesia);
+        setCortesiaMotivo(d.cortesia_motivo ?? '');
+      }
+    } catch { /* silencioso */ }
+  }
+
+  async function saveCortesia(ativo: boolean, motivo: string) {
+    if (!lead) return;
+    setCortesia(ativo); // otimista
+    setCortesiaLoading(true);
+    try {
+      await fetch(`/api/leads/${lead.id}/cortesia`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: lead.telefone, ativo, motivo }),
+      });
+    } finally {
+      setCortesiaLoading(false);
+    }
   }
 
   function toggleTag(tag: string) {
@@ -130,72 +304,208 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
     setEditData(p => ({ ...p, tags: next }));
   }
 
-  async function handleDeleteConfirm() {
-    if (!lead || !onDeleteCard || deleteLoading) return;
-    setDeleteLoading(true);
+  async function handleDescadastrarConfirm() {
+    if (!lead || !confirmAction || actionLoading) return;
+    setActionLoading(true);
     try {
-      await onDeleteCard(lead);
-      setConfirmDelete(false);
+      if (confirmAction === 'tudo') {
+        // Apagar planilha + CRM: tira o card e descadastra no clinica_ia (sai da base/reativação/mensagens).
+        if (onDescadastrar) await onDescadastrar(lead, 'apagar');
+        else if (onDeleteCard) await onDeleteCard(lead);
+      } else {
+        // Apagar do CRM: remove só o card; o paciente continua na planilha/base.
+        if (onDeleteCard) await onDeleteCard(lead);
+        else if (onDescadastrar) await onDescadastrar(lead, 'sair');
+      }
+      setConfirmAction(null);
+      setApagarText('');
       onClose();
     } finally {
-      setDeleteLoading(false);
+      setActionLoading(false);
     }
   }
+
+  const primeiroNome = (lead?.nome ?? '').trim().split(' ')[0] || '';
 
   if (!lead) return null;
 
   const etapa     = getEtapa(lead.etapa_atual);
   const slaStatus = calcSLAStatus(lead);
+  const slaPausado = isSLAPausado(lead);
   const idade     = calcularIdade(lead.data_nascimento);
   const d         = { ...lead, ...editData };
 
-  // Etapas do mesmo pipeline para mover
-  const pipelineDoLead = (lead.pipeline_id ?? 1) === 2 ? PIPELINE_2 : PIPELINE_1;
-  const etapasParaMover = pipelineDoLead.filter(e => e.id !== lead.etapa_atual);
+  // "Eu cuido": liga/desliga a pausa do SLA (o Dr está conduzindo o caso na mão).
+  async function toggleEuCuido() {
+    const cur = lead!.tags ?? [];
+    const novo = slaPausado
+      ? cur.filter(t => t.trim().toLowerCase() !== TAG_EU_CUIDO.toLowerCase())
+      : [...cur, TAG_EU_CUIDO];
+    setLead({ ...lead!, tags: novo });
+    await onUpdate(lead!.id, { tags: novo });
+  }
+
+  // Colunas-alvo para mover: pipeline escolhido no seletor; esconde a etapa atual quando é o mesmo pipeline
+  const pipelineAtualDoLead = (lead.pipeline_id ?? 1) === 2 ? 2 : 1;
+  const colunasAlvo = movePipeline === 'proc' ? [] : (movePipeline === 2 ? PIPELINE_2 : PIPELINE_1)
+    .filter(e => !(movePipeline === pipelineAtualDoLead && e.id === lead.etapa_atual));
 
   const totalFinanceiro = financeiro.reduce((acc, f) => acc + (f.valor ?? 0), 0);
+
+  // Toggle de cortesia (mesmo estado nos 2 lugares → sempre sincronizado)
+  const cortesiaBox = (
+    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2 dark:bg-amber-950/20 dark:border-amber-800/40">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">🎁 Próxima consulta de cortesia</p>
+          <p className="text-[10px] text-muted-foreground">A IA agenda sem cobrar e avisa que é por conta do Dr. · uso único</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => saveCortesia(!cortesia, cortesiaMotivo)}
+          disabled={cortesiaLoading}
+          aria-pressed={cortesia}
+          className={cn('relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors', cortesia ? 'bg-emerald-500' : 'bg-muted-foreground/30')}
+        >
+          <span className={cn('absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform', cortesia && 'translate-x-5')} />
+        </button>
+      </div>
+      {cortesia && (
+        <Input
+          placeholder="Motivo (opcional): ex. trazer exame, revisão de conduta"
+          value={cortesiaMotivo}
+          onChange={e => setCortesiaMotivo(e.target.value)}
+          onBlur={() => saveCortesia(true, cortesiaMotivo)}
+          className="h-7 text-xs"
+        />
+      )}
+    </div>
+  );
+
+  async function enviarCobranca(dry: boolean) {
+    if (!lead || !cobTexto.trim()) return;
+    setCobLoading(true); setCobResult(null);
+    try {
+      const res = await fetch('/api/cobranca', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: cobTexto, telefone: lead.telefone, card_id: lead.id, dry_run: dry }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const termos = Number(data.max_parcelas) > 1
+          ? ` em até ${data.max_parcelas}x${data.juros ? '' : ' sem juros'}`
+          : ' à vista';
+        if (data.enviado === false) {
+          setCobResult({ ok: true, msg: `🔍 Simulação: cobraria ${data.paciente} R$ ${data.valor}${termos}. Nada foi enviado.` });
+        } else {
+          setCobResult({ ok: true, msg: `✅ Cobrança enviada para ${data.paciente}: R$ ${data.valor}${termos}. Link enviado no WhatsApp.` });
+          setCobTexto('');
+        }
+      } else {
+        setCobResult({ ok: false, msg: `⚠️ ${data.erro || 'Não consegui cobrar'}` });
+      }
+    } catch {
+      setCobResult({ ok: false, msg: '⚠️ Erro de conexão ao enviar a cobrança.' });
+    } finally {
+      setCobLoading(false);
+    }
+  }
+
+  async function agendarRetorno() {
+    if (!lead || !/^\d{4}-\d{2}-\d{2}$/.test(retData) || retLoading) return;
+    setRetLoading('retorno'); setRetResult(null);
+    try {
+      const res = await fetch('/api/pos-consulta/agendar-retorno', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card_id: lead.id, telefone: lead.telefone, data: retData, horario: retHora, valor: retValor }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setRetResult({ ok: true, msg: `✅ Retorno de ${data.paciente || lead.nome} agendado. O card foi pra "Retorno Agendado".` });
+        setTimeout(() => onClose(), 1200);
+      } else {
+        setRetResult({ ok: false, msg: `⚠️ ${data.error || 'Não consegui agendar o retorno.'}` });
+      }
+    } catch {
+      setRetResult({ ok: false, msg: '⚠️ Erro de conexão ao agendar o retorno.' });
+    } finally {
+      setRetLoading('');
+    }
+  }
+
+  async function darAlta() {
+    if (!lead || retLoading) return;
+    setRetLoading('alta'); setRetResult(null);
+    try {
+      await onUpdate(lead.id, { pipeline_id: 2, etapa_atual: 'Recorrente' });
+      setRetResult({ ok: true, msg: '✅ Paciente recebeu alta — virou Recorrente.' });
+      setTimeout(() => onClose(), 1000);
+    } catch {
+      setRetResult({ ok: false, msg: '⚠️ Erro ao dar alta.' });
+    } finally {
+      setRetLoading('');
+    }
+  }
 
   const SECTIONS: { id: Section; label: string }[] = [
     { id: 'detalhes',   label: 'Detalhes' },
     { id: 'perfil',     label: 'Perfil' },
+    ...((lead.pipeline_id ?? 1) === 2 ? [{ id: 'poscon' as Section, label: 'Pós-consulta' }] : []),
     { id: 'financeiro', label: `Financeiro${totalFinanceiro > 0 ? ` (${formatarMoeda(totalFinanceiro)})` : ''}` },
     { id: 'historico',  label: 'Histórico' },
     { id: 'notas',      label: `Notas (${notas.length})` },
   ];
 
   return (
-    <Dialog open={!!lead} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
+    <Dialog open={!!lead} onOpenChange={(open) => { if (!open) { setLead(null); onClose(); } }}>
+      <DialogContent className="lead-modal max-w-3xl max-h-[90vh] flex flex-col">
+        <DialogHeader
+          className="flex-shrink-0 hdr-navy-grad"
+          style={{ borderBottom: '2px solid #c2a650' }}
+        >
           <div className="flex items-start gap-3">
             <div
-              className="w-3 h-3 rounded-full mt-1.5 flex-shrink-0"
+              className="w-3 h-3 rounded-full mt-2 flex-shrink-0 ring-2 ring-white/20"
               style={{ backgroundColor: etapa?.corHex ?? '#6B7280' }}
             />
             <div className="flex-1 min-w-0">
-              <DialogTitle className="text-base leading-tight">{lead.nome}</DialogTitle>
+              <DialogTitle className="text-lg font-bold leading-tight text-brand-cream">{lead.nome}</DialogTitle>
               <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-brand-cream/65">
                   {getOrigemIcon(lead.origem)} {lead.origem}
                 </span>
                 {idade !== null && (
-                  <span className="text-xs text-muted-foreground">· {idade} anos</span>
+                  <span className="text-xs text-brand-cream/65">· {idade} anos</span>
                 )}
                 {lead.sexo && (
-                  <span className="text-xs text-muted-foreground">· {lead.sexo}</span>
+                  <span className="text-xs text-brand-cream/65">· {lead.sexo}</span>
                 )}
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-brand-cream/65">
                   · Pipeline {lead.pipeline_id ?? 1}
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
+              {isComercial(lead) && (
+                <span className="px-2 py-0.5 bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/40 rounded text-xs font-bold">🏢 Comercial</span>
+              )}
               {lead.movido_por_ia && (
                 <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs font-bold">AUTO</span>
               )}
-              {slaStatus === 'atrasado' && (
+              {slaStatus === 'atrasado' && !slaPausado && (
                 <span className="px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs font-bold animate-sla-pulse">SLA!</span>
               )}
+              <button
+                onClick={toggleEuCuido}
+                title={slaPausado ? 'SLA pausado — você está conduzindo. Clique pra reativar o SLA.' : 'Pausar o SLA: você está conduzindo este caso na mão'}
+                className={cn('flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold border transition-colors',
+                  slaPausado
+                    ? 'bg-slate-500/25 text-slate-200 border-slate-400/40 hover:bg-slate-500/35'
+                    : 'bg-white/5 text-brand-cream/70 border-white/15 hover:bg-white/10')}
+              >
+                ⏸ {slaPausado ? 'Eu cuido' : 'Eu cuido?'}
+              </button>
               {lead.chatwoot_url && (
                 <a
                   href={lead.chatwoot_url}
@@ -208,8 +518,27 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
                   Chatwoot
                 </a>
               )}
+              <button
+                onClick={() => { setShowCob(v => !v); setCobResult(null); }}
+                className="flex items-center gap-1 px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded text-xs font-medium transition-colors"
+              >
+                💸 Cobrar
+              </button>
+              <button
+                onClick={() => setTarefaOpen(true)}
+                title="Mandar tarefa pra Nathalia sobre este paciente"
+                className="flex items-center gap-1 px-2 py-1 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 rounded text-xs font-medium transition-colors"
+              >
+                <Sparkles className="h-3 w-3" /> Tarefa
+              </button>
             </div>
           </div>
+          {tarefaOpen && (
+            <TarefaNathaliaModal
+              prefill={{ nome: lead.nome, telefone: lead.telefone }}
+              onClose={() => setTarefaOpen(false)}
+            />
+          )}
 
           {/* Section tabs */}
           <div className="flex gap-0.5 mt-3 flex-wrap">
@@ -218,8 +547,8 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
                 key={s.id}
                 onClick={() => setActiveSection(s.id)}
                 className={cn('px-3 py-1 rounded text-xs font-medium transition-colors', {
-                  'bg-primary text-primary-foreground': activeSection === s.id,
-                  'text-muted-foreground hover:text-foreground hover:bg-accent': activeSection !== s.id,
+                  'bg-brand-gold text-brand-navy shadow-sm': activeSection === s.id,
+                  'text-brand-cream/70 hover:text-brand-cream hover:bg-white/10': activeSection !== s.id,
                 })}
               >
                 {s.label}
@@ -228,12 +557,71 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
           </div>
         </DialogHeader>
 
+        {leadProp?.agendamento && (
+          <div className="flex-shrink-0 mx-6 mt-2 px-3 py-2 rounded-lg border border-blue-500/40 bg-blue-500/10 text-sm">
+            📅 <span className="font-bold text-blue-700 dark:text-blue-400">{leadProp.agendamento.tipo === 'retorno' ? 'Retorno' : leadProp.agendamento.tipo === 'procedimento' ? 'Procedimento' : 'Consulta'} agendada:</span>{' '}
+            <span className="font-semibold">{leadProp.agendamento.data_br} às {leadProp.agendamento.hora_br}</span>
+          </div>
+        )}
+
+        {showCob && (
+          <div className="flex-shrink-0 mx-6 mt-1 mb-1 p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-2">
+            <p className="text-xs font-semibold text-emerald-600">💸 Cobrar {lead.nome?.split(' ')[0]} — a Nathalia envia o link</p>
+            <Textarea
+              value={cobTexto}
+              onChange={e => setCobTexto(e.target.value)}
+              placeholder="Ex.: cobra a consulta de R$ 500, pode em até 2x sem juros"
+              className="text-sm min-h-[56px]"
+            />
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button size="sm" variant="outline" onClick={() => enviarCobranca(true)} disabled={cobLoading || !cobTexto.trim()}>🔍 Simular</Button>
+              <Button size="sm" onClick={() => enviarCobranca(false)} disabled={cobLoading || !cobTexto.trim()}>
+                {cobLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}Enviar cobrança
+              </Button>
+              <span className="text-[11px] text-muted-foreground">Vai uma mensagem da Nathalia com link de pagamento pro WhatsApp do paciente.</span>
+            </div>
+            {cobResult && (
+              <p className={cn('text-xs p-2 rounded', cobResult.ok ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-red-500/15 text-red-500')}>{cobResult.msg}</p>
+            )}
+          </div>
+        )}
+
+        {lead.pipeline_id === 2 && (lead.etapa_atual === 'Pós Consulta' || lead.etapa_atual === 'Agend. Retorno') && (
+          <div className="flex-shrink-0 mx-6 mt-1 mb-1 p-3 rounded-lg border border-sky-500/30 bg-sky-500/5 space-y-2">
+            <p className="text-xs font-semibold text-foreground">🩺 Pós-consulta — qual o destino de {lead.nome?.split(' ')[0]}?</p>
+            <div className="flex flex-wrap items-end gap-2">
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-0.5">Data do retorno</label>
+                <Input type="date" value={retData} onChange={e => setRetData(e.target.value)} className="h-8 text-sm w-36" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-0.5">Hora</label>
+                <Input type="time" value={retHora} onChange={e => setRetHora(e.target.value)} className="h-8 text-sm w-24" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-0.5">Valor (R$)</label>
+                <Input type="number" value={retValor} onChange={e => setRetValor(e.target.value)} placeholder="opcional" className="h-8 text-sm w-24" />
+              </div>
+              <Button size="sm" onClick={agendarRetorno} disabled={retLoading !== '' || !/^\d{4}-\d{2}-\d{2}$/.test(retData)} className="text-white" style={{ backgroundColor: '#0EA5E9' }}>
+                {retLoading === 'retorno' ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}Agendar retorno
+              </Button>
+              <Button size="sm" variant="outline" onClick={darAlta} disabled={retLoading !== ''}>
+                {retLoading === 'alta' ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}Alta / Recorrente
+              </Button>
+            </div>
+            {retResult && (
+              <p className={cn('text-xs p-2 rounded', retResult.ok ? 'bg-sky-500/15 text-sky-700 dark:text-sky-400' : 'bg-red-500/15 text-red-500')}>{retResult.msg}</p>
+            )}
+          </div>
+        )}
+
         <div className="flex-1 min-h-0 overflow-y-auto pr-3">
           <div className="px-6 pt-5 pb-6 space-y-5">
 
             {/* ── DETALHES ── */}
             {activeSection === 'detalhes' && (
               <div className="space-y-5">
+                {cortesiaBox}
                 {/* Stage + SLA */}
                 <div
                   className="flex items-center gap-2 p-3 rounded-lg border"
@@ -300,11 +688,26 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
                     )}
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Valor da Consulta</label>
+                    <label className="text-xs text-muted-foreground mb-1 block">Valor combinado</label>
                     {isEditing ? (
                       <Input type="number" value={d.valor_consulta ?? lead.valor_consulta} onChange={e => setEditData(p => ({ ...p, valor_consulta: parseFloat(e.target.value) }))} className="h-8 text-sm" />
                     ) : (
-                      <p className="text-sm font-semibold text-emerald-600">{formatarMoeda(lead.valor_consulta)}</p>
+                      <>
+                        <p className="text-sm font-semibold text-foreground">{formatarMoeda(lead.valor_consulta)}</p>
+                        <span className="text-[10px] text-muted-foreground">combinado · não é valor recebido</span>
+                        {(() => {
+                          const valor = lead.valor_consulta ?? 0;
+                          const pago = lead.total_investido ?? 0;
+                          // "Ainda não pagou" só nas colunas de agendamento (consulta marcada e não paga).
+                          const podeApagar = ['Agendado','Retorno Agendado'].includes(lead.etapa_atual);
+                          let label: string; let cls: string;
+                          if (valor > 0 && pago >= valor) { label = `Pago integral (${formatarMoeda(pago)})`; cls = 'text-emerald-600 bg-emerald-500/10 border-emerald-500/30'; }
+                          else if (pago > 0) { label = valor > 0 ? `Sinal pago: ${formatarMoeda(pago)} de ${formatarMoeda(valor)}` : `Recebido: ${formatarMoeda(pago)}`; cls = 'text-amber-600 bg-amber-500/10 border-amber-500/30'; }
+                          else if (valor > 0 && podeApagar) { label = `Ainda não pagou (${formatarMoeda(valor)} a receber)`; cls = 'text-red-500 bg-red-500/10 border-red-500/30'; }
+                          else { label = 'Sem pagamento registrado'; cls = 'text-muted-foreground bg-muted/30 border-border'; }
+                          return <span className={`mt-1 flex w-fit items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border ${cls}`}>💰 {label}</span>;
+                        })()}
+                      </>
                     )}
                   </div>
                 </div>
@@ -325,23 +728,75 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
                   </div>
                 )}
 
-                {/* Mover para etapa */}
+                {/* Mover card — escolhe pipeline + coluna (sincroniza com a clínica) */}
                 <div>
-                  <label className="text-xs text-muted-foreground mb-2 block">Mover para etapa</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {etapasParaMover.map(e => (
+                  <label className="text-xs text-muted-foreground mb-2 block">Mover card</label>
+                  <div className="inline-flex rounded-md border border-border p-0.5 mb-2">
+                    {([1, 2, 'proc'] as const).map(pid => (
                       <button
-                        key={e.id}
-                        onClick={() => handleMoverPara(e.id)}
-                        disabled={loading}
-                        className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-colors hover:opacity-80"
-                        style={{ borderColor: `${e.corHex}80`, color: e.corHex, backgroundColor: `${e.corHex}15` }}
+                        key={String(pid)}
+                        onClick={() => setMovePipeline(pid)}
+                        className={cn('px-2.5 py-1 rounded text-xs font-medium transition-colors',
+                          movePipeline === pid
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:text-foreground')}
                       >
-                        <ArrowRight className="h-2.5 w-2.5" />
-                        {e.nome}
+                        {pid === 'proc' ? 'Procedimentos' : `Pipeline ${pid}${pipelineAtualDoLead === pid ? ' • atual' : ''}`}
                       </button>
                     ))}
                   </div>
+
+                  {movePipeline === 'proc' ? (
+                    <div className="space-y-2 rounded-md border border-border p-2.5 bg-muted/30">
+                      <p className="text-[11px] text-muted-foreground">Configura o procedimento e move o paciente para a aba <b>Procedimentos</b>. A agenda e a IA acompanham.</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={procForm.nome} onChange={e => setProcForm(p => ({ ...p, nome: e.target.value }))} placeholder="Procedimento (ex: Ozonioterapia)" className="col-span-2 h-8 px-2 rounded-md text-xs border border-border bg-background outline-none" />
+                        <input value={procForm.sessoes} onChange={e => setProcForm(p => ({ ...p, sessoes: e.target.value.replace(/\D/g, '') }))} placeholder="Nº de sessões" inputMode="numeric" className="h-8 px-2 rounded-md text-xs border border-border bg-background outline-none" />
+                        <select value={procForm.periodicidade} onChange={e => setProcForm(p => ({ ...p, periodicidade: e.target.value }))} className="h-8 px-2 rounded-md text-xs border border-border bg-background outline-none">
+                          <option value="semanal">Semanal</option>
+                          <option value="quinzenal">Quinzenal</option>
+                          <option value="mensal">Mensal</option>
+                        </select>
+                        <input value={procForm.valor} onChange={e => setProcForm(p => ({ ...p, valor: e.target.value }))} placeholder="Valor total (R$)" inputMode="decimal" className="col-span-2 h-8 px-2 rounded-md text-xs border border-border bg-background outline-none" />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">Escolha a coluna de destino:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {PROC_COLS.map(c => (
+                          <button
+                            key={c.id}
+                            onClick={() => handleMoverProcedimento(c.id)}
+                            disabled={loading}
+                            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-colors hover:opacity-80 disabled:opacity-50"
+                            style={{ borderColor: `${c.corHex}80`, color: c.corHex, backgroundColor: `${c.corHex}15` }}
+                          >
+                            <ArrowRight className="h-2.5 w-2.5" />{c.nome}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-1.5">
+                        {colunasAlvo.map(e => (
+                          <button
+                            key={e.id}
+                            onClick={() => handleTransferir(movePipeline as 1 | 2, e.id)}
+                            disabled={loading}
+                            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-colors hover:opacity-80 disabled:opacity-50"
+                            style={{ borderColor: `${e.corHex}80`, color: e.corHex, backgroundColor: `${e.corHex}15` }}
+                          >
+                            <ArrowRight className="h-2.5 w-2.5" />
+                            {e.nome}
+                          </button>
+                        ))}
+                      </div>
+                      {movePipeline !== pipelineAtualDoLead && (
+                        <p className="text-[10px] text-muted-foreground mt-1.5">
+                          Transfere para o Pipeline {movePipeline}. Os fluxos da clínica acompanham a mudança automaticamente.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 <p className="text-xs text-muted-foreground">
@@ -509,9 +964,9 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
-                      {(lead.tags ?? []).length === 0 ? (
+                      {(lead.tags ?? []).filter(t => !ehTagInterna(t)).length === 0 ? (
                         <p className="text-sm text-muted-foreground">Nenhuma tag.</p>
-                      ) : (lead.tags ?? []).map(tag => (
+                      ) : (lead.tags ?? []).filter(t => !ehTagInterna(t)).map(tag => (
                         <span key={tag} className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-medium">
                           {formatarTag(tag)}
                         </span>
@@ -537,13 +992,156 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
               </div>
             )}
 
+            {/* ── PÓS-CONSULTA ── */}
+            {activeSection === 'poscon' && (
+              <div className="space-y-5">
+                <p className="text-xs text-muted-foreground">
+                  Preenchido após a consulta. A IA usa estes dados para conduzir o pós-consulta, o retorno e o procedimento.
+                </p>
+
+                {cortesiaBox}
+
+                {/* Tempo de retorno */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Tempo de retorno</label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      type="number" min={0}
+                      value={posData.retorno_num ?? ''}
+                      onChange={e => setPosData(p => ({ ...p, retorno_num: e.target.value }))}
+                      className="h-8 text-sm w-24" placeholder="nº"
+                    />
+                    <Select value={posData.retorno_unidade ?? ''} onValueChange={v => setPosData(p => ({ ...p, retorno_unidade: v }))}>
+                      <SelectTrigger className="h-8 text-sm w-40"><SelectValue placeholder="unidade" /></SelectTrigger>
+                      <SelectContent>
+                        {['dias', 'semanas', 'meses', 'anos'].map(u => (
+                          <SelectItem key={u} value={u} className="capitalize">{u}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {posData.data_retorno_previsto && (
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Retorno previsto: {formatarData(posData.data_retorno_previsto)}
+                    </p>
+                  )}
+                </div>
+
+                {/* Tem procedimento? */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Tem procedimento?</label>
+                  <div className="inline-flex rounded-md border border-border p-0.5">
+                    {([['Não', false], ['Sim', true]] as const).map(([lbl, val]) => (
+                      <button
+                        key={lbl}
+                        onClick={() => setPosData(p => ({ ...p, tem_procedimento: val }))}
+                        className={cn('px-3 py-1 rounded text-xs font-medium transition-colors',
+                          !!posData.tem_procedimento === val ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
+                      >
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Campos do procedimento */}
+                {!!posData.tem_procedimento && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-border pt-4">
+                    <div className="sm:col-span-2">
+                      <label className="text-xs text-muted-foreground mb-1 block">Nome do procedimento</label>
+                      <Input value={posData.proc_nome ?? ''} onChange={e => setPosData(p => ({ ...p, proc_nome: e.target.value }))} className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Nº de sessões</label>
+                      <Input type="number" min={0} value={posData.proc_sessoes ?? ''} onChange={e => setPosData(p => ({ ...p, proc_sessoes: e.target.value }))} className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Tempo de tratamento</label>
+                      <Input value={posData.proc_tempo_tratamento ?? ''} onChange={e => setPosData(p => ({ ...p, proc_tempo_tratamento: e.target.value }))} className="h-8 text-sm" placeholder="ex: 10 semanas" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Periodicidade</label>
+                      <Input value={posData.proc_periodicidade ?? ''} onChange={e => setPosData(p => ({ ...p, proc_periodicidade: e.target.value }))} className="h-8 text-sm" placeholder="ex: semanal" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Valor cheio (R$)</label>
+                      <Input type="number" min={0} step="0.01" value={posData.proc_valor_cheio ?? ''} onChange={e => setPosData(p => ({ ...p, proc_valor_cheio: e.target.value }))} className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Valor piso/mínimo (R$)</label>
+                      <Input type="number" min={0} step="0.01" value={posData.proc_valor_piso ?? ''} onChange={e => setPosData(p => ({ ...p, proc_valor_piso: e.target.value }))} className="h-8 text-sm" />
+                    </div>
+                    {posData.proc_status && posData.proc_status !== 'nenhum' && (
+                      <div className="sm:col-span-2 text-[10px] text-muted-foreground">
+                        Status do procedimento: <span className="font-semibold capitalize">{posData.proc_status}</span>
+                        {posData.proc_valor_fechado ? <span className="text-emerald-600"> · fechado em {formatarMoeda(Number(posData.proc_valor_fechado))}</span> : null}
+                      </div>
+                    )}
+
+                    {/* Pagamento do procedimento na clínica (item 23) */}
+                    <div className="sm:col-span-2 border-t border-border pt-3">
+                      {posData.proc_status === 'pago' ? (
+                        <p className="text-sm text-emerald-600 font-medium">
+                          ✓ Procedimento pago{posData.proc_valor_fechado ? ` — ${formatarMoeda(Number(posData.proc_valor_fechado))} lançado no financeiro` : ''}
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground block">Pagamento do procedimento</label>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Input type="number" step="0.01" min="0" placeholder="Valor pago (R$)"
+                              value={procPagoValor} onChange={e => setProcPagoValor(e.target.value)} className="h-8 text-sm w-36" />
+                            <Button onClick={handleProcPago} disabled={!procPagoValor || procPagoLoading} size="sm" className="h-8 gap-1 text-xs">
+                              {procPagoLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                              Marcar pago na clínica
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            Marque quando o paciente pagar direto na clínica: lança no financeiro e a Nathalia já chama o paciente pra organizar as sessões. Para cobrar pela IA, deixe o fluxo normal seguir.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <Button onClick={handleSavePosConsulta} disabled={posLoading} size="sm" className="gap-1">
+                  {posLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                  Salvar pós-consulta
+                </Button>
+              </div>
+            )}
+
             {/* ── FINANCEIRO ── */}
             {activeSection === 'financeiro' && (
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold">Total: {formatarMoeda(totalFinanceiro)}</p>
+                  <p className="text-sm font-semibold">Recebido: <span className="text-emerald-600">{formatarMoeda(totalFinanceiro)}</span></p>
                   <span className="text-xs text-muted-foreground">{financeiro.length} registros</span>
                 </div>
+
+                {/* Lançar pagamento manual (PIX, dinheiro, cartão na clínica). InfinitePay entra sozinho. */}
+                <div className="p-4 border border-border rounded-lg space-y-2 bg-muted/20">
+                  <p className="text-xs font-medium">Lançar pagamento recebido</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Select value={newPagTipo} onValueChange={setNewPagTipo}>
+                      <SelectTrigger className="h-8 text-xs w-32"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sinal">Sinal</SelectItem>
+                        <SelectItem value="consulta">Consulta</SelectItem>
+                        <SelectItem value="procedimento">Procedimento</SelectItem>
+                        <SelectItem value="exame">Exame</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input type="number" step="0.01" min="0" placeholder="Valor (R$)" value={newPagValor} onChange={e => setNewPagValor(e.target.value)} className="h-8 text-xs w-28" />
+                    <Input placeholder="Descrição (opcional)" value={newPagDesc} onChange={e => setNewPagDesc(e.target.value)} className="h-8 text-xs flex-1 min-w-[120px]" />
+                    <Button onClick={handleAddFinanceiro} disabled={!newPagValor || loading} size="sm" className="h-8 gap-1 text-xs">
+                      <Plus className="h-3 w-3" /> Lançar
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Pagamentos via InfinitePay entram automáticos. Use aqui para PIX, dinheiro ou cartão na clínica.</p>
+                </div>
+
                 {financeiro.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-6">Nenhum registro financeiro.</p>
                 ) : financeiro.map(f => (
@@ -632,23 +1230,30 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-border flex-shrink-0">
           <div className="flex items-center gap-2">
-            {/* Excluir Lead */}
-            {onDeleteCard && !isEditing && (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="px-2.5 py-1.5 rounded text-xs font-medium border transition-colors"
-                style={{ color: '#EF4444', borderColor: '#EF444440' }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#EF444412';
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = '#EF444470';
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = '';
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = '#EF444440';
-                }}
-              >
-                Excluir Lead
-              </button>
+            {/* Sair do CRM / Apagar de tudo */}
+            {(onDescadastrar || onDeleteCard) && !isEditing && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => { setConfirmAction('crm'); setApagarText(''); }}
+                  className="px-2.5 py-1.5 rounded text-xs font-medium border transition-colors"
+                  style={{ color: '#F97316', borderColor: '#F9731640' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#F9731612'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = ''; }}
+                  title="Remove só o card do CRM; o paciente continua na planilha/base e a Nathalia segue atendendo"
+                >
+                  Apagar do CRM
+                </button>
+                <button
+                  onClick={() => { setConfirmAction('tudo'); setApagarText(''); }}
+                  className="px-2.5 py-1.5 rounded text-xs font-medium border transition-colors"
+                  style={{ color: '#EF4444', borderColor: '#EF444440' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#EF444412'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = ''; }}
+                  title="Tira do CRM E da planilha (base): sai da reativação e para as mensagens. Irreversível."
+                >
+                  Apagar planilha + CRM
+                </button>
+              </div>
             )}
             {/* Editar / Salvar */}
             {isEditing ? (
@@ -666,36 +1271,59 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onMoveCard, onDel
               </Button>
             )}
           </div>
-          <Button onClick={onClose} variant="ghost" size="sm">
+          <Button onClick={() => { setLead(null); onClose(); }} variant="ghost" size="sm">
             <X className="h-4 w-4 mr-1" /> Fechar
           </Button>
         </div>
       </DialogContent>
 
-      {/* Dialog de confirmação de exclusão */}
-      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      {/* Dialog de confirmação — Sair do CRM / Apagar de tudo */}
+      <Dialog open={!!confirmAction} onOpenChange={(o) => { if (!o) { setConfirmAction(null); setApagarText(''); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Excluir lead?</DialogTitle>
+            <DialogTitle>{confirmAction === 'tudo' ? 'Apagar planilha + CRM?' : 'Apagar do CRM?'}</DialogTitle>
             <DialogDescription>
-              Tem certeza que deseja excluir <strong>{lead.nome}</strong>? Esta ação não pode ser desfeita.
+              {confirmAction === 'tudo' ? (
+                <>
+                  <strong>{lead.nome}</strong> sai do <strong>CRM E da planilha</strong> (base de pacientes): para de
+                  receber mensagens e sai da reativação. As <strong>consultas e o prontuário são preservados</strong>. Esta ação é{' '}
+                  <strong>irreversível</strong>.<br /><br />
+                  Para confirmar, digite o primeiro nome: <strong>{primeiroNome}</strong>
+                </>
+              ) : (
+                <>
+                  <strong>{lead.nome}</strong> sai <strong>só do CRM</strong> (o card é removido). Continua na
+                  planilha/base e a Nathalia segue atendendo — pode voltar ao CRM numa próxima mensagem.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
+          {confirmAction === 'tudo' && (
+            <div className="px-6">
+              <input
+                value={apagarText}
+                onChange={e => setApagarText(e.target.value)}
+                placeholder={primeiroNome}
+                autoFocus
+                className="w-full text-sm rounded px-2 py-1.5 border border-border bg-background outline-none focus:border-red-400"
+              />
+            </div>
+          )}
           <DialogFooter>
-            <Button onClick={() => setConfirmDelete(false)} variant="outline" size="sm">
+            <Button onClick={() => { setConfirmAction(null); setApagarText(''); }} variant="outline" size="sm">
               Cancelar
             </Button>
             <button
-              onClick={handleDeleteConfirm}
-              disabled={deleteLoading}
+              onClick={handleDescadastrarConfirm}
+              disabled={actionLoading || (confirmAction === 'tudo' && apagarText.trim().toLowerCase() !== primeiroNome.toLowerCase())}
               className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium text-white transition-colors disabled:opacity-60"
-              style={{ backgroundColor: '#EF4444' }}
+              style={{ backgroundColor: confirmAction === 'tudo' ? '#EF4444' : '#F97316' }}
             >
-              {deleteLoading
+              {actionLoading
                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 : <Trash2  className="h-3.5 w-3.5" />
               }
-              {deleteLoading ? 'Excluindo...' : 'Excluir'}
+              {actionLoading ? 'Processando...' : (confirmAction === 'tudo' ? 'Apagar planilha + CRM' : 'Apagar do CRM')}
             </button>
           </DialogFooter>
         </DialogContent>

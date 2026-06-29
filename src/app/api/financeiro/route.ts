@@ -46,5 +46,19 @@ export async function POST(req: NextRequest) {
   const total = (totals ?? []).reduce((acc, r) => acc + (r.valor ?? 0), 0);
   await supabase.from('leads').update({ total_investido: total }).eq('id', lead_id);
 
+  // Ponte p/ o dashboard: o faturamento/Dashboard lê clinica_ia.pagamentos (outro banco).
+  // Aqui também gravamos lá (via webhook WF87), achando o paciente pelo telefone, pra o
+  // pagamento manual (PIX/dinheiro/cartão) aparecer no faturamento. Não bloqueia se falhar.
+  try {
+    const { data: lead } = await supabase.from('leads').select('telefone').eq('id', lead_id).single();
+    if (lead?.telefone) {
+      await fetch('https://n8n.drluizguedes.com.br/webhook/lancar-pagamento-manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: lead.telefone, valor: Number(valor), tipo: tipo ?? 'outro' }),
+      });
+    }
+  } catch { /* a ponte é best-effort; o lançamento no Supabase já foi salvo */ }
+
   return NextResponse.json(data, { status: 201 });
 }

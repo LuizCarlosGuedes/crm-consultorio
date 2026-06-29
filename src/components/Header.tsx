@@ -1,13 +1,42 @@
 'use client';
 
-import { useState } from 'react';
-
-import { Search, Plus, RefreshCw, LayoutGrid, List, Menu, X } from 'lucide-react';
-import { ThemeToggle } from './ThemeToggle';
+import { useState, useEffect } from 'react';
+import { Search, Plus, RefreshCw, LayoutGrid, List } from 'lucide-react';
 import { Stage } from '@/lib/types';
 
-export type ActiveTab = 'dashboard' | 'pipeline1' | 'pipeline2' | 'pendencias' | 'retornos' | 'descadastrados';
+// Relógio ao vivo (data + hora de Brasília) no topo do CRM.
+function Relogio() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(t);
+  }, []);
+  const data = now.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
+  const hora = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+  return (
+    <div className="hidden sm:flex flex-col items-end leading-tight mr-1.5 select-none">
+      <span className="text-xs font-bold tabular-nums" style={{ color: '#f7f6f4' }}>{hora}</span>
+      <span className="text-[9px] capitalize" style={{ color: '#c2a650' }}>{data}</span>
+    </div>
+  );
+}
+
+export type ActiveTab = 'dashboard' | 'pipeline1' | 'pipeline2' | 'procedimentos' | 'agenda' | 'conteudo' | 'pendencias' | 'retornos' | 'reativacao' | 'descadastrados';
 export type ViewMode  = 'kanban' | 'lista';
+
+// Abas do CRM — usadas pelo menu lateral (Sidebar) e pelo título da barra de cima.
+export const TABS: { id: ActiveTab; label: string }[] = [
+  { id: 'dashboard',       label: 'Dashboard'       },
+  { id: 'pipeline1',       label: 'Pipeline 1'      },
+  { id: 'pipeline2',       label: 'Pipeline 2'      },
+  { id: 'procedimentos',   label: 'Procedimentos'   },
+  { id: 'agenda',          label: 'Agenda'          },
+  { id: 'conteudo',        label: 'Conteúdo'        },
+  { id: 'pendencias',      label: 'Pendências'      },
+  { id: 'retornos',        label: 'Retornos'        },
+  { id: 'reativacao',      label: 'Reativação'      },
+  { id: 'descadastrados',  label: 'Descadastrados'  },
+];
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -34,110 +63,42 @@ const FILTERS = [
   { label: 'Frio',    value: 'frio'    },
 ];
 
-const TABS: { id: ActiveTab; label: string }[] = [
-  { id: 'dashboard',       label: 'Dashboard'       },
-  { id: 'pipeline1',       label: 'Pipeline 1'      },
-  { id: 'pipeline2',       label: 'Pipeline 2'      },
-  { id: 'pendencias',      label: 'Pendências'      },
-  { id: 'retornos',        label: 'Retornos'        },
-  { id: 'descadastrados',  label: 'Descadastrados'  },
-];
-
 export function Header({
-  activeTab, onTabChange,
+  activeTab,
   viewMode, onViewModeChange,
   searchTerm, onSearchChange,
   filterPrioridade, onFilterChange,
   filterEtapa, onFilterEtapaChange,
   stages,
   onAddLead, onRefresh,
-  pendenciasCount = 0,
 }: HeaderProps) {
   const showFilterBar = activeTab === 'pipeline1' || activeTab === 'pipeline2';
-  const [menuOpen, setMenuOpen] = useState(false);
+  const activeLabel = TABS.find(t => t.id === activeTab)?.label ?? '';
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-40"
-      style={{ backgroundColor: '#0b1a35' }}
+      className="fixed top-0 right-0 z-40"
+      style={{ left: 60, background: 'linear-gradient(180deg, #0e2247 0%, #0a1830 100%)', boxShadow: '0 1px 0 rgba(194,166,80,0.22), 0 10px 30px -14px rgba(0,0,0,0.55)' }}
     >
       {/* ── Top bar ─────────────────────────────────── */}
       <div
-        className="flex items-center justify-between px-4 py-2"
+        className="flex items-center justify-between px-4 h-[53px]"
         style={{ borderBottom: '1px solid #3f4e68' }}
       >
-        {/* Logo + Nav */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          {/* Hambúrguer — só no mobile */}
-          <button
-            onClick={() => setMenuOpen(o => !o)}
-            className="md:hidden w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
-            style={{ color: '#f7f6f4' }}
-            aria-label="Menu"
-          >
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div
-              className="w-7 h-7 rounded-md flex items-center justify-center font-black text-[10px]"
-              style={{ backgroundColor: '#c2a650', color: '#0b1a35' }}
-            >
-              CRM
-            </div>
-            <span
-              className="font-semibold text-sm hidden md:block whitespace-nowrap"
-              style={{ color: '#f7f6f4' }}
-            >
-              Dr. Luiz Guedes
-            </span>
-          </div>
-
-          {/* Nav tabs */}
-          <nav className="hidden md:flex items-center gap-0.5 ml-2 flex-1 min-w-0 overflow-x-auto">
-            {TABS.map(tab => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => onTabChange(tab.id)}
-                  className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
-                  style={
-                    isActive
-                      ? { backgroundColor: '#c2a650', color: '#0b1a35', fontWeight: 700 }
-                      : { color: '#e0e0e0' }
-                  }
-                  onMouseEnter={e => {
-                    if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = '#3f4e68';
-                  }}
-                  onMouseLeave={e => {
-                    if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-                  }}
-                >
-                  {tab.label}
-                  {tab.id === 'pendencias' && pendenciasCount > 0 && (
-                    <span
-                      className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-bold px-1 leading-none"
-                      style={
-                        isActive
-                          ? { backgroundColor: '#0b1a35', color: '#c2a650' }
-                          : { backgroundColor: '#c2a650', color: '#0b1a35' }
-                      }
-                    >
-                      {pendenciasCount > 99 ? '99+' : pendenciasCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
+        {/* Título da aba ativa */}
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="font-semibold text-base whitespace-nowrap truncate" style={{ color: '#f7f6f4' }}>
+            {activeLabel}
+          </span>
         </div>
 
         {/* Right actions */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          <Relogio />
           {/* Kanban / Lista toggle */}
           {showFilterBar && (
             <div
-              className="hidden md:flex items-center rounded-md overflow-hidden"
+              className="flex items-center rounded-md overflow-hidden"
               style={{ border: '1px solid #3f4e68' }}
             >
               {(['kanban', 'lista'] as ViewMode[]).map(v => (
@@ -169,11 +130,6 @@ export function Header({
           >
             <RefreshCw className="h-4 w-4" />
           </button>
-
-          {/* Theme toggle */}
-          <div style={{ color: '#e0e0e0' }}>
-            <ThemeToggle />
-          </div>
 
           {/* + Novo Lead */}
           <button
@@ -255,36 +211,6 @@ export function Header({
               );
             })}
           </div>
-
-        </div>
-      )}
-      {/* Menu mobile (abre no hambúrguer) */}
-      {menuOpen && (
-        <div
-          className="md:hidden absolute top-full left-0 right-0 flex flex-col shadow-lg"
-          style={{ backgroundColor: '#0b1a35', borderBottom: '1px solid #3f4e68' }}
-        >
-          {TABS.map(tab => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => { onTabChange(tab.id); setMenuOpen(false); }}
-                className="flex items-center justify-between px-4 py-3 text-sm font-medium text-left transition-colors"
-                style={isActive ? { backgroundColor: '#c2a650', color: '#0b1a35', fontWeight: 700 } : { color: '#e0e0e0' }}
-              >
-                <span>{tab.label}</span>
-                {tab.id === 'pendencias' && pendenciasCount > 0 && (
-                  <span
-                    className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-bold px-1 leading-none"
-                    style={isActive ? { backgroundColor: '#0b1a35', color: '#c2a650' } : { backgroundColor: '#c2a650', color: '#0b1a35' }}
-                  >
-                    {pendenciasCount > 99 ? '99+' : pendenciasCount}
-                  </span>
-                )}
-              </button>
-            );
-          })}
         </div>
       )}
     </header>

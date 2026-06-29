@@ -2,6 +2,12 @@ import { Stage } from './types';
 
 export const PIPELINE_1: Stage[] = [
   {
+    id: 'Pendência', nome: 'Pendência',
+    cor: 'text-red-500', corBg: 'bg-red-500/15', corBorda: 'border-red-500/60', corHex: '#EF4444',
+    slaMinutos: 1440, slaLabel: '24h', pipeline: 1,
+    descricao: 'Pacientes pedindo algo (receita, exame, etc.). Resolva aqui mesmo — o card some ao resolver.',
+  },
+  {
     id: 'Novo Lead', nome: 'Novo Lead',
     cor: 'text-blue-500', corBg: 'bg-blue-500/15', corBorda: 'border-blue-500/60', corHex: '#3B82F6',
     slaMinutos: 0.5, slaLabel: '30 seg', pipeline: 1,
@@ -40,7 +46,7 @@ export const PIPELINE_1: Stage[] = [
   {
     id: 'No Show', nome: 'No Show',
     cor: 'text-red-600', corBg: 'bg-red-500/15', corBorda: 'border-red-500/60', corHex: '#EF4444',
-    slaMinutos: 15, slaLabel: '15 min', pipeline: 1,
+    slaMinutos: 60, slaLabel: '1h', pipeline: 1,
     descricao: 'Paciente não compareceu à consulta. Tentativa de reagendamento em andamento.',
   },
   {
@@ -72,6 +78,12 @@ export const PIPELINE_1: Stage[] = [
     cor: 'text-teal-500', corBg: 'bg-teal-500/15', corBorda: 'border-teal-500/60', corHex: '#14B8A6',
     slaMinutos: 10080, slaLabel: 'Semanal', pipeline: 1,
     descricao: 'Lead recebendo conteúdo semanal automático do Agente IA para manter o relacionamento até estar pronto.',
+  },
+  {
+    id: 'Comercial', nome: 'Comercial',
+    cor: 'text-slate-400', corBg: 'bg-slate-500/15', corBorda: 'border-slate-500/60', corHex: '#64748B',
+    slaMinutos: 525600, slaLabel: '—', pipeline: 1,
+    descricao: 'Contatos comerciais/B2B (fornecedores, parcerias) e não-pacientes. Fora dos fluxos de atendimento — revise e dê o destino manualmente.',
   },
 ];
 

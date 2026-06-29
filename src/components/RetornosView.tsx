@@ -128,13 +128,13 @@ export function RetornosView({ retornos, loading, onRefresh, onUpdate }: Retorno
         <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/40">
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">Nome</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">Telefone</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">Data Retorno</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">Status</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">Dias p/ Retorno</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Observações</th>
+              <tr className="border-b-2 border-brand-gold hdr-navy">
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-cream/80 whitespace-nowrap">Nome</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-cream/80 whitespace-nowrap">Telefone</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-cream/80 whitespace-nowrap">Data Retorno</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-cream/80 whitespace-nowrap">Status</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-cream/80 whitespace-nowrap">Dias p/ Retorno</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-cream/80">Observações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
@@ -292,11 +292,11 @@ export function RetornosView({ retornos, loading, onRefresh, onUpdate }: Retorno
             <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm opacity-70">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-muted/40">
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">Nome</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">Telefone</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">Data Retorno</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Observações</th>
+                  <tr className="border-b-2 border-brand-gold hdr-navy">
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-cream/80 whitespace-nowrap">Nome</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-cream/80 whitespace-nowrap">Telefone</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-cream/80 whitespace-nowrap">Data Retorno</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-cream/80">Observações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
