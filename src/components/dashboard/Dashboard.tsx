@@ -694,9 +694,13 @@ export function Dashboard({ leads }: DashboardProps) {
             <Kpi icon={TrendingUp} label="Ticket médio" value={formatarMoeda(ticket)} sub="por paciente pagante" grad={[C.navy, C.slate]} />
             <Kpi icon={CalendarCheck} label="Receita prevista" value={r ? formatarMoeda(r.receita_prevista) : '—'} sub="valor dos agendados" grad={['#6d3fb3', C.violet]} />
           </div>
-          <Section title="Faturamento por método de pagamento" icon={Wallet}>
-            <Bars data={(r?.fat_por_metodo ?? []).map(m => ({ label: m.metodo, n: Math.round(m.valor) }))} color={C.emerald} />
-            <Soon items={['Faturamento por serviço (consulta/retorno/procedimento)', 'Receita por canal de origem', 'Receita perdida estimada (faltas + cancelamentos)']} />
+          <Section title="Faturamento por serviço" icon={Wallet}>
+            <Bars data={(r?.fat_por_tipo ?? []).map(t => ({ label: (({ consulta: 'Consulta', retorno: 'Retorno', procedimento: 'Procedimento', acompanhamento: 'Acompanhamento', sinal: 'Sinal / Reserva', exame: 'Exame', pagamento: 'Outro', outro: 'Outro' } as Record<string, string>)[t.tipo] ?? t.tipo), n: Math.round(t.valor) }))} color={C.emerald} />
+            <Soon items={['Receita por canal de origem', 'Receita perdida estimada (faltas + cancelamentos)']} />
+          </Section>
+
+          <Section title="Faturamento por forma de pagamento" icon={Wallet}>
+            <Bars data={(r?.fat_por_metodo ?? []).map(m => ({ label: (({ pix: 'PIX', dinheiro: 'Dinheiro', cartao: 'Cartão', cartao_credito: 'Cartão', cartao_debito: 'Cartão', convenio: 'Convênio', clinica: 'Clínica (não informado)', infinitepay: 'InfinitePay', outro: 'Outro' } as Record<string, string>)[m.metodo] ?? m.metodo), n: Math.round(m.valor) }))} color={C.violet} />
           </Section>
         </div>
       )}

@@ -165,3 +165,37 @@ export function diasNaEtapa(lead: Lead): number {
     return 0;
   }
 }
+
+// Nota automática antiga que a Nathalia gravava em TODO lead ("captado no WhatsApp"),
+// nem sempre verdade. Não deve mais aparecer como observação real.
+export const NOTA_AUTO_CAPTACAO = 'Lead captado pela Nathalia via WhatsApp';
+export function ehNotaAutomatica(nota: string | null | undefined): boolean {
+  return (nota ?? '').trim().toLowerCase() === NOTA_AUTO_CAPTACAO.toLowerCase();
+}
+
+// De ONDE o lead veio (google, indicação, instagram...). Lê `como_conheceu`, que é
+// preenchido pela IA ([ORIGEM:canal]) ou pela atribuição de anúncio. Diferente de
+// `origem`, que é só o CANAL (WhatsApp). Retorna null quando ainda não sabemos.
+export interface OrigemLead { label: string; icon: string; cls: string; }
+const ORIGEM_MAP: Record<string, OrigemLead> = {
+  google:          { label: 'Google',    icon: '🔍', cls: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/40' },
+  anuncio:         { label: 'Anúncio',   icon: '📣', cls: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/40' },
+  instagram:       { label: 'Instagram', icon: '📸', cls: 'bg-pink-100 text-pink-700 border-pink-300 dark:bg-pink-500/15 dark:text-pink-300 dark:border-pink-500/40' },
+  facebook:        { label: 'Facebook',  icon: '👍', cls: 'bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-500/40' },
+  youtube:         { label: 'YouTube',   icon: '▶️', cls: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/40' },
+  tiktok:          { label: 'TikTok',    icon: '🎵', cls: 'bg-slate-200 text-slate-800 border-slate-300 dark:bg-slate-600/30 dark:text-slate-200 dark:border-slate-500/40' },
+  indicacao:       { label: 'Indicação', icon: '🤝', cls: 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/40' },
+  organico:        { label: 'Orgânico',  icon: '🌱', cls: 'bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-500/15 dark:text-teal-300 dark:border-teal-500/40' },
+  'base anterior': { label: 'Base',      icon: '📁', cls: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-600/20 dark:text-slate-300 dark:border-slate-500/40' },
+  outros:          { label: 'Outro',     icon: '📍', cls: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-600/20 dark:text-slate-300 dark:border-slate-500/40' },
+  outro:           { label: 'Outro',     icon: '📍', cls: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-600/20 dark:text-slate-300 dark:border-slate-500/40' },
+};
+export function getOrigemLead(lead: Lead): OrigemLead | null {
+  const raw = (lead.como_conheceu ?? '').trim();
+  if (!raw) return null;
+  const key = raw.toLowerCase();
+  const norm = key.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const hit = ORIGEM_MAP[key] || ORIGEM_MAP[norm];
+  if (hit) return hit;
+  return { label: raw.charAt(0).toUpperCase() + raw.slice(1), icon: '📍', cls: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-600/20 dark:text-slate-300 dark:border-slate-500/40' };
+}

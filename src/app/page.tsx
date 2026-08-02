@@ -24,7 +24,7 @@ export default function Home() {
   const [activeTab, setActiveTab]       = useState<ActiveTab>('pipeline1');
   const [viewMode,  setViewMode]        = useState<ViewMode>('kanban');
   const [leads,     setLeads]           = useState<Lead[]>([]);
-  const [agendaMap, setAgendaMap]       = useState<Record<string, { data_br: string; hora_br: string; tipo: string }>>({});
+  const [agendaMap, setAgendaMap]       = useState<Record<string, { data_br: string; hora_br: string; tipo: string; consulta_id?: string }>>({});
   const [loading,   setLoading]         = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -53,9 +53,9 @@ export default function Home() {
     try {
       const r = await fetch('/api/agendamentos', { cache: 'no-store' });
       const j = await r.json();
-      const m: Record<string, { data_br: string; hora_br: string; tipo: string }> = {};
+      const m: Record<string, { data_br: string; hora_br: string; tipo: string; consulta_id?: string }> = {};
       for (const a of (j.agendamentos ?? [])) {
-        if (a?.tel8) m[a.tel8] = { data_br: a.data_br, hora_br: a.hora_br, tipo: a.tipo };
+        if (a?.tel8) m[a.tel8] = { data_br: a.data_br, hora_br: a.hora_br, tipo: a.tipo, consulta_id: a.consulta_id };
       }
       setAgendaMap(m);
     } catch { /* sem agendamentos */ }

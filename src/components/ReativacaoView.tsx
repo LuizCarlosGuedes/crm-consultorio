@@ -18,6 +18,8 @@ export interface PacienteReativacao {
   cidade: string;
   email: string;
   meses_sem_retornar: number | null;
+  status_contato?: string;
+  ultimo_contato?: string | null;
 }
 
 // Faixas de "sem retornar" — derivadas dos meses
@@ -34,6 +36,9 @@ const faixaDe = (m: number | null) => {
   return '>4a';
 };
 const FAIXA_HEX: Record<string, string> = { '<6m': '#10B981', '6-12m': '#06B6D4', '1-2a': '#c2a650', '2-4a': '#F97316', '>4a': '#ef4444', sem_data: '#64748b' };
+// Status de contato da campanha de reativação (vem do n8n: campanha_reativacao_*)
+const jaContatado = (p: PacienteReativacao) => Boolean(p.ultimo_contato) || (!!p.status_contato && p.status_contato !== 'pendente');
+const STATUS_LABEL: Record<string, string> = { pendente: 'A contatar', em_andamento: 'Contatado', concluida: 'Contatado (3/3)', respondeu: 'Respondeu', optout: 'Saiu' };
 // Abre o paciente no CHATWOOT (não no WhatsApp). Acha/cria a conversa pela rota e redireciona.
 // Abre a aba na hora do clique (gesto do usuário) pra não ser bloqueada, e ajusta a URL depois.
 async function abrirChat(p: PacienteReativacao) {
@@ -57,6 +62,7 @@ export function ReativacaoView() {
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState('');
   const [faixa, setFaixa] = useState<string>('todas');
+  const [view, setView] = useState<'todos' | 'a_contatar' | 'ja_contatados'>('todos');
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [disp, setDisp] = useState(false);
   const [dispMsg, setDispMsg] = useState<{ ok: boolean; txt: string } | null>(null);
@@ -77,14 +83,23 @@ export function ReativacaoView() {
     return c;
   }, [pacientes]);
 
+  // Contagem A Contatar x Já Contatados
+  const contagem = useMemo(() => {
+    let a = 0, j = 0;
+    for (const p of pacientes) { if (jaContatado(p)) j++; else a++; }
+    return { a, j };
+  }, [pacientes]);
+
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
     return pacientes.filter(p => {
+      if (view === 'a_contatar' && jaContatado(p)) return false;
+      if (view === 'ja_contatados' && !jaContatado(p)) return false;
       if (faixa !== 'todas' && faixaDe(p.meses_sem_retornar) !== faixa) return false;
       if (q && !(`${p.nome} ${p.telefone}`.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [pacientes, busca, faixa]);
+  }, [pacientes, busca, faixa, view]);
 
   const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleTodos = () => setSel(s => s.size === filtrados.length ? new Set() : new Set(filtrados.map(p => p.id)));
@@ -108,6 +123,7 @@ export function ReativacaoView() {
       if (data.ok) {
         setDispMsg({ ok: true, txt: `✅ Campanha disparada para ${data.solicitados} paciente(s). A Nathalia está enviando pelo WhatsApp — o resumo chega no seu Telegram.` });
         setSel(new Set());
+        setTimeout(fetchBase, 1500);
       } else {
         setDispMsg({ ok: false, txt: `⚠️ ${data.erro || 'Não consegui disparar a campanha.'}` });
       }
@@ -129,6 +145,22 @@ export function ReativacaoView() {
         </div>
         <button onClick={fetchBase} className="p-1.5 rounded-md border border-border hover:bg-accent transition-colors" title="Atualizar">
           <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
+        </button>
+      </div>
+
+      {/* Separação: A Contatar x Já Contatados */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        <button onClick={() => setView('todos')}
+          className={cn('px-3 py-1 rounded-md text-xs font-semibold border transition-colors', view === 'todos' ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-accent')}>
+          Todos · {pacientes.length}
+        </button>
+        <button onClick={() => setView('a_contatar')}
+          className={cn('px-3 py-1 rounded-md text-xs font-semibold border transition-colors', view === 'a_contatar' ? 'bg-sky-600 text-white border-sky-600' : 'border-sky-500/50 text-sky-600 bg-sky-500/10 hover:bg-sky-500/20')}>
+          🔵 A Contatar · {contagem.a}
+        </button>
+        <button onClick={() => setView('ja_contatados')}
+          className={cn('px-3 py-1 rounded-md text-xs font-semibold border transition-colors', view === 'ja_contatados' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-emerald-500/50 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20')}>
+          🟢 Já Contatados · {contagem.j}
         </button>
       </div>
 
@@ -174,12 +206,14 @@ export function ReativacaoView() {
               <th className="px-2 py-2 text-center font-semibold">Sem retornar</th>
               <th className="px-2 py-2 text-center font-semibold">Consultas</th>
               <th className="px-2 py-2 text-center font-semibold">Origem</th>
+              <th className="px-2 py-2 text-center font-semibold">Contato</th>
               <th className="px-2 py-2 text-center font-semibold">Chat</th>
             </tr>
           </thead>
           <tbody>
             {filtrados.slice(0, 600).map(p => {
               const f = faixaDe(p.meses_sem_retornar);
+              const contatado = jaContatado(p);
               return (
                 <tr key={p.id} className="border-t border-border hover:bg-accent/40">
                   <td className="px-2 py-1.5 text-center"><input type="checkbox" checked={sel.has(p.id)} onChange={() => toggle(p.id)} /></td>
@@ -193,6 +227,15 @@ export function ReativacaoView() {
                   </td>
                   <td className="px-2 py-1.5 text-center text-muted-foreground">{p.qtd_consultas || '—'}</td>
                   <td className="px-2 py-1.5 text-center text-[10px] text-muted-foreground truncate max-w-[120px]">{p.origem || '—'}</td>
+                  <td className="px-2 py-1.5 text-center">
+                    {contatado ? (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-600" title={p.ultimo_contato ? `Contatado em ${p.ultimo_contato}` : 'Já contatado'}>
+                        {STATUS_LABEL[p.status_contato || 'em_andamento'] || 'Contatado'}{p.ultimo_contato ? ` · ${p.ultimo_contato}` : ''}
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/15 text-sky-600">A contatar</span>
+                    )}
+                  </td>
                   <td className="px-2 py-1.5 text-center">
                     <button type="button" onClick={() => abrirChat(p)} title="Abrir no Chatwoot" className="inline-flex text-emerald-600 hover:opacity-70"><MessageCircle className="h-3.5 w-3.5" /></button>
                   </td>
@@ -209,6 +252,7 @@ export function ReativacaoView() {
       <div className="md:hidden space-y-2">
         {filtrados.slice(0, 200).map(p => {
           const f = faixaDe(p.meses_sem_retornar);
+          const contatado = jaContatado(p);
           return (
             <div key={p.id} className="rounded-lg border border-border p-2.5 flex items-start gap-2">
               <input type="checkbox" checked={sel.has(p.id)} onChange={() => toggle(p.id)} className="mt-1" />
@@ -216,6 +260,9 @@ export function ReativacaoView() {
                 <p className="text-sm font-medium truncate">{p.nome}</p>
                 <p className="text-xs text-muted-foreground">{p.telefone} · {p.qtd_consultas || 0} consultas</p>
                 <p className="text-[11px] text-muted-foreground">Última: {p.ultima_consulta || '—'}</p>
+                <p className="text-[11px] font-medium" style={{ color: contatado ? '#059669' : '#0284c7' }}>
+                  {contatado ? `🟢 Contatado${p.ultimo_contato ? ' · ' + p.ultimo_contato : ''}` : '🔵 A contatar'}
+                </p>
               </div>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold flex-shrink-0" style={{ backgroundColor: `${FAIXA_HEX[f]}20`, color: FAIXA_HEX[f] }}>
                 {p.meses_sem_retornar == null ? 'sem data' : `${Math.round(p.meses_sem_retornar)}m`}

@@ -47,7 +47,7 @@ export interface Lead {
   ultima_mensagem?: string | null;
   // Próximo agendamento (consulta/retorno/procedimento AGENDADO no clinica_ia, sincronizado com o Google).
   // Preenchido no CRM ao mesclar /api/agendamentos; some sozinho quando não há consulta futura.
-  agendamento?: { data_br: string; hora_br: string; tipo: string } | null;
+  agendamento?: { data_br: string; hora_br: string; tipo: string; consulta_id?: string } | null;
 }
 
 export interface HistoricoMovimentacao {

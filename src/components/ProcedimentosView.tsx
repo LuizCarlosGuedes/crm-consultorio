@@ -21,6 +21,8 @@ export interface Procedimento {
   proc_nome: string;
   proc_sessoes: number;
   proc_valor_cheio: number | string | null;
+  proc_valor_fechado?: number | string | null;
+  crm_card_id?: string | null;
   proc_status: string;
   proc_periodicidade: string | null;
   sessoes_agendadas: number;
@@ -231,7 +233,29 @@ function Modal({ p, acting, onClose, onAcao, onRefresh }: { p: Procedimento; act
   const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState({ proc_nome: p.proc_nome || '', proc_sessoes: String(p.proc_sessoes || ''), proc_valor_cheio: p.proc_valor_cheio == null ? '' : String(p.proc_valor_cheio), proc_periodicidade: p.proc_periodicidade || 'semanal' });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [lancando, setLancando] = useState(false);
+  const [lancRes, setLancRes] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [metodoLanc, setMetodoLanc] = useState('pix');
   useEffect(() => { setEdit({ proc_nome: p.proc_nome || '', proc_sessoes: String(p.proc_sessoes || ''), proc_valor_cheio: p.proc_valor_cheio == null ? '' : String(p.proc_valor_cheio), proc_periodicidade: p.proc_periodicidade || 'semanal' }); }, [p]);
+  useEffect(() => { setLancRes(null); }, [p.id]);
+
+  // Lança o valor do acompanhamento no financeiro (pagamentos + financeiro CRM), idempotente no backend.
+  async function lancarFinanceiro() {
+    if (lancando) return;
+    const valor = Number(p.proc_valor_cheio);
+    if (!(valor > 0)) { setLancRes({ ok: false, msg: 'Defina o valor do acompanhamento antes (botão editar ✎).' }); return; }
+    setLancando(true); setLancRes(null);
+    try {
+      const res = await fetch('/api/procedimentos/lancar-financeiro', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paciente_id: p.id, valor, metodo: metodoLanc }),
+      });
+      const data = await res.json();
+      if (data.ok) { setLancRes({ ok: true, msg: `✅ Lançado no financeiro: ${formatValor(valor)}.` }); onRefresh(); }
+      else { setLancRes({ ok: false, msg: `⚠️ ${data.error || data.mensagem || 'Não consegui lançar.'}` }); }
+    } catch { setLancRes({ ok: false, msg: '⚠️ Erro de conexão ao lançar.' }); }
+    finally { setLancando(false); }
+  }
 
   async function salvarEdicao() {
     setSavingEdit(true);
@@ -275,6 +299,33 @@ function Modal({ p, acting, onClose, onAcao, onRefresh }: { p: Procedimento; act
                   <div><div className="text-muted-foreground">Valor</div><div className="font-semibold">{formatValor(p.proc_valor_cheio)}</div></div>
                   <div><div className="text-muted-foreground">Frequência</div><div className="font-semibold capitalize">{p.proc_periodicidade || '—'}</div></div>
                 </div>
+                {/* Lançar no financeiro — o valor do acompanhamento vai pro Financeiro (idempotente) */}
+                {(p.proc_valor_fechado != null && p.proc_valor_fechado !== '') ? (
+                  <div className="mt-2 text-[11px] font-medium text-emerald-600 flex items-center gap-1">✓ Lançado no financeiro · {formatValor(p.proc_valor_fechado)}</div>
+                ) : (
+                  <div className="mt-2 space-y-1.5">
+                    <select
+                      value={metodoLanc}
+                      onChange={e => setMetodoLanc(e.target.value)}
+                      className="w-full h-7 px-2 rounded border border-border bg-background text-[11px]"
+                    >
+                      <option value="pix">Forma: PIX</option>
+                      <option value="dinheiro">Forma: Dinheiro</option>
+                      <option value="cartao">Forma: Cartão</option>
+                      <option value="convenio">Forma: Convênio</option>
+                      <option value="outro">Forma: Outro</option>
+                    </select>
+                    <button
+                      onClick={lancarFinanceiro}
+                      disabled={lancando || !(Number(p.proc_valor_cheio) > 0)}
+                      title={Number(p.proc_valor_cheio) > 0 ? '' : 'Defina o valor primeiro (editar ✎)'}
+                      className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                    >
+                      {lancando ? 'Lançando…' : `💰 Lançar no financeiro (${formatValor(p.proc_valor_cheio)})`}
+                    </button>
+                  </div>
+                )}
+                {lancRes && <div className={`mt-1 text-[11px] ${lancRes.ok ? 'text-emerald-600' : 'text-red-500'}`}>{lancRes.msg}</div>}
               </>
             ) : (
               <div className="space-y-2">

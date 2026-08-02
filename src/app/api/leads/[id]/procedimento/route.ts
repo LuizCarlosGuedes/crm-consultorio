@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // 1) Configura o procedimento (nome/sessões/valor/periodicidade/coluna)
     const res = await fetch(N8N_PROC, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-webhook-token': process.env.WEBHOOK_SECRET_TOKEN ?? '' },
       body: JSON.stringify({
         card_id: id,
         telefone: body.telefone ?? '',
@@ -36,8 +36,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       try {
         const p = await fetch(N8N_PROC_PAGO, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ card_id: id, telefone: body.telefone ?? '', valor }),
+          headers: { 'Content-Type': 'application/json', 'x-webhook-token': process.env.WEBHOOK_SECRET_TOKEN ?? '' },
+          body: JSON.stringify({ card_id: id, telefone: body.telefone ?? '', valor, metodo: body.metodo ?? 'clinica' }),
         });
         pago = p.ok;
       } catch { /* não bloqueia a transferência se o lançamento falhar */ }

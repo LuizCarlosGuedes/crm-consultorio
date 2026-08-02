@@ -21,6 +21,7 @@ import {
   calcSLAStatus, formatarData, formatarMoeda, formatarTempoRelativo,
   getOrigemIcon, getEtapa, calcularIdade, formatarTag, cn,
   isSLAPausado, TAG_EU_CUIDO, isComercial, ehTagInterna,
+  getOrigemLead, ehNotaAutomatica,
 } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
@@ -88,6 +89,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
   const [newNotaAutor,      setNewNotaAutor]      = useState('Atendente');
   const [newPagTipo,        setNewPagTipo]        = useState('sinal');
   const [newPagValor,       setNewPagValor]       = useState('');
+  const [newPagMetodo,      setNewPagMetodo]      = useState('pix');
   const [newPagDesc,        setNewPagDesc]         = useState('');
   const [loading,           setLoading]           = useState(false);
   const [activeSection,     setActiveSection]     = useState<Section>('detalhes');
@@ -99,6 +101,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
   const [posData,           setPosData]           = useState<PosData>({});
   const [posLoading,        setPosLoading]        = useState(false);
   const [procPagoValor,     setProcPagoValor]     = useState('');
+  const [procMetodo,        setProcMetodo]        = useState('pix');
   const [procPagoLoading,   setProcPagoLoading]   = useState(false);
   const [cortesia,          setCortesia]          = useState(false);
   const [cortesiaMotivo,    setCortesiaMotivo]    = useState('');
@@ -110,6 +113,15 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
   const [cobTexto,   setCobTexto]   = useState('');
   const [cobLoading, setCobLoading] = useState(false);
   const [cobResult,  setCobResult]  = useState<{ ok: boolean; msg: string } | null>(null);
+  // Stand By (Pipeline 2): possível data de retorno p/ paciente indeciso — só lembrete, não cobra/agenda
+  const [sbData,    setSbData]    = useState('');
+  const [sbLoading, setSbLoading] = useState(false);
+  const [sbResult,  setSbResult]  = useState<{ ok: boolean; msg: string } | null>(null);
+  // Instruir Nathalia (qualquer card): Dr digita a orientação → IA lê histórico + instrução e conduz a conversa
+  const [showInstr,    setShowInstr]    = useState(false);
+  const [instrTexto,   setInstrTexto]   = useState('');
+  const [instrLoading, setInstrLoading] = useState(false);
+  const [instrResult,  setInstrResult]  = useState<{ ok: boolean; msg: string } | null>(null);
   // Pós-consulta (Pipeline 2): agendar retorno / dar alta
   const [retData,    setRetData]    = useState('');
   const [retHora,    setRetHora]    = useState('14:00');
@@ -123,6 +135,12 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
     setIsEditing(false);
     setActiveSection('detalhes');
     setMovePipeline((lead.pipeline_id ?? 1) === 2 ? 2 : 1);
+    // Zera os estados de ação por-card ao trocar de card — senão o resultado de um
+    // (ex.: "Nathalia enviou..." de uma paciente) vaza pra outro card (bug reportado).
+    setShowInstr(false); setInstrTexto(''); setInstrResult(null); setInstrLoading(false);
+    setShowCob(false); setCobTexto(''); setCobResult(null); setCobLoading(false);
+    setSbData(''); setSbResult(null); setSbLoading(false);
+    setRetResult(null);
     fetchHistorico(lead.id);
     fetchNotas(lead.id);
     fetchFinanceiro(lead.id);
@@ -191,7 +209,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
     const res = await fetch('/api/financeiro', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lead_id: lead.id, tipo: newPagTipo, descricao: newPagDesc, valor: valorNum }),
+      body: JSON.stringify({ lead_id: lead.id, tipo: newPagTipo, metodo: newPagMetodo, descricao: newPagDesc, valor: valorNum }),
     });
     if (res.ok) {
       await fetchFinanceiro(lead.id);
@@ -224,6 +242,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
           proc_valor: procForm.valor ? parseFloat(procForm.valor.replace(/\./g, '').replace(',', '.')) : null,
           proc_periodicidade: procForm.periodicidade,
           proc_status: status,
+          metodo: procMetodo,
         }),
       });
       // Move de verdade: configurou o procedimento no clinica_ia → remove o card do Pipeline.
@@ -257,7 +276,7 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
       const res = await fetch(`/api/leads/${lead.id}/procedimento-pago`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telefone: lead.telefone, valor: v }),
+        body: JSON.stringify({ telefone: lead.telefone, valor: v, metodo: procMetodo }),
       });
       if (res.ok) {
         const pc = await fetch(`/api/leads/${lead.id}/pos-consulta?telefone=${encodeURIComponent(lead.telefone)}`);
@@ -434,6 +453,58 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
     }
   }
 
+  // Stand By: salva/limpa a possível data de retorno (write-only; o valor atual aparece no briefing diário)
+  async function salvarDataRetornoPossivel() {
+    if (!lead || sbLoading) return;
+    if (sbData && !/^\d{4}-\d{2}-\d{2}$/.test(sbData)) return;
+    setSbLoading(true); setSbResult(null);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/data-retorno`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: lead.telefone, data: sbData }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setSbResult({ ok: true, msg: sbData
+          ? `✅ Possível retorno salvo: ${sbData.split('-').reverse().join('/')}. Aparece no briefing diário.`
+          : '✅ Data possível de retorno limpa.' });
+      } else {
+        setSbResult({ ok: false, msg: `⚠️ ${data.error || 'Não consegui salvar a data.'}` });
+      }
+    } catch {
+      setSbResult({ ok: false, msg: '⚠️ Erro de conexão ao salvar a data.' });
+    } finally {
+      setSbLoading(false);
+    }
+  }
+
+  // Instruir Nathalia: envia a orientação; a IA lê o histórico + a instrução e responde à paciente conduzindo a conversa
+  async function instruirNathalia() {
+    if (!lead || instrLoading) return;
+    const txt = instrTexto.trim();
+    if (!txt) return;
+    setInstrLoading(true); setInstrResult(null);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/instruir`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: lead.telefone, instrucao: txt }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setInstrResult({ ok: true, msg: data.pendente
+          ? `⏳ ${data.mensagem || ''}`
+          : `✅ Nathalia enviou: "${data.mensagem || ''}"` });
+        setInstrTexto('');
+      } else {
+        setInstrResult({ ok: false, msg: `⚠️ ${data.error || 'Não consegui enviar.'}` });
+      }
+    } catch {
+      setInstrResult({ ok: false, msg: '⚠️ Erro de conexão ao instruir a Nathalia.' });
+    } finally {
+      setInstrLoading(false);
+    }
+  }
+
   async function darAlta() {
     if (!lead || retLoading) return;
     setRetLoading('alta'); setRetResult(null);
@@ -475,6 +546,24 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
                 <span className="text-xs text-brand-cream/65">
                   {getOrigemIcon(lead.origem)} {lead.origem}
                 </span>
+                {(() => {
+                  const orig = getOrigemLead(lead);
+                  return orig ? (
+                    <span
+                      title={`De onde veio: ${orig.label}`}
+                      className={cn('inline-flex items-center gap-0.5 text-[11px] font-semibold rounded px-1.5 py-0.5 leading-none border', orig.cls)}
+                    >
+                      {orig.icon} {orig.label}
+                    </span>
+                  ) : (
+                    <span
+                      title="Origem ainda não identificada — a Nathalia vai perguntar"
+                      className="inline-flex items-center text-[11px] rounded px-1.5 py-0.5 leading-none border border-dashed border-brand-cream/30 text-brand-cream/50"
+                    >
+                      origem?
+                    </span>
+                  );
+                })()}
                 {idade !== null && (
                   <span className="text-xs text-brand-cream/65">· {idade} anos</span>
                 )}
@@ -640,6 +729,71 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
                   )}
                 </div>
 
+                {/* Última objeção — registrada pela Nathalia (aparece em qualquer etapa) */}
+                {(() => {
+                  const obj = notas.find(n => n.conteudo && n.conteudo.includes('Objeção ('));
+                  if (!obj) return null;
+                  const cat = (obj.conteudo.match(/Objeção\s*\(([^)]*)\)/) || [])[1] || '';
+                  const texto = obj.conteudo.replace(/^.*?Objeção\s*\([^)]*\)\s*:\s*/, '').trim();
+                  return (
+                    <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-500/50 bg-amber-500/10">
+                      <span className="text-base leading-none mt-0.5">🗣️</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-amber-600">Última objeção{cat ? ` · ${cat}` : ''}</p>
+                        <p className="text-sm text-foreground break-words">{texto || obj.conteudo}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Detectada pela Nathalia em {formatarData(obj.criado_em)} · histórico completo na aba Notas</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Instruir a Nathalia — o Dr orienta e a IA conduz a conversa (disponível em qualquer card/momento) */}
+                <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
+                  {!showInstr ? (
+                    <button
+                      onClick={() => setShowInstr(true)}
+                      className="w-full flex items-center justify-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                    >
+                      💬 Instruir a Nathalia
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-primary block">💬 Instruir a Nathalia</label>
+                      <p className="text-[10px] text-muted-foreground">
+                        Escreva a orientação. A Nathalia lê o histórico desta conversa + a sua instrução e responde à paciente no WhatsApp, conduzindo a conversa.
+                      </p>
+                      <textarea
+                        value={instrTexto}
+                        onChange={e => setInstrTexto(e.target.value)}
+                        rows={3}
+                        placeholder="Ex.: Diga que consegui encaixá-la quinta às 15h e pergunte se prefere manhã ou tarde."
+                        className="w-full text-sm rounded border border-border bg-background p-2 resize-y focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <div className="flex gap-2 items-center">
+                        <button
+                          onClick={instruirNathalia}
+                          disabled={instrLoading || !instrTexto.trim()}
+                          className={cn('px-3 py-1.5 rounded text-xs font-medium transition-colors',
+                            instrLoading || !instrTexto.trim() ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground hover:bg-primary/90')}
+                        >
+                          {instrLoading ? 'Nathalia escrevendo…' : 'Enviar orientação'}
+                        </button>
+                        <button
+                          onClick={() => { setShowInstr(false); setInstrResult(null); }}
+                          className="px-3 py-1.5 rounded text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          Fechar
+                        </button>
+                      </div>
+                      {instrResult && (
+                        <p className={cn('text-[11px] mt-1 break-words', instrResult.ok ? 'text-emerald-600' : 'text-red-500')}>
+                          {instrResult.msg}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="min-w-0">
                     <label className="text-xs text-muted-foreground mb-1 block">Nome</label>
@@ -715,9 +869,9 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Observação</label>
                   {isEditing ? (
-                    <Textarea value={d.nota ?? lead.nota} onChange={e => setEditData(p => ({ ...p, nota: e.target.value }))} rows={3} className="text-sm" />
+                    <Textarea value={d.nota ?? (ehNotaAutomatica(lead.nota) ? '' : lead.nota)} onChange={e => setEditData(p => ({ ...p, nota: e.target.value }))} rows={3} className="text-sm" />
                   ) : (
-                    <p className="text-sm text-muted-foreground bg-muted/50 rounded p-2 min-h-[40px]">{lead.nota || 'Sem observações.'}</p>
+                    <p className="text-sm text-muted-foreground bg-muted/50 rounded p-2 min-h-[40px]">{(lead.nota && !ehNotaAutomatica(lead.nota)) ? lead.nota : 'Sem observações.'}</p>
                   )}
                 </div>
 
@@ -1027,6 +1181,35 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
                   )}
                 </div>
 
+                {/* Possível data de retorno — Stand By (paciente indeciso) */}
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+                  <label className="text-xs font-medium text-amber-600 mb-1 block">🕒 Possível data de retorno (Stand By)</label>
+                  <p className="text-[10px] text-muted-foreground mb-2">
+                    Para paciente indeciso que ainda não escolheu a data. Só um lembrete — não cria consulta nem cobra. Aparece no briefing diário do Dr. enquanto o card estiver em Stand By. Deixe em branco e salve para limpar.
+                  </p>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      type="date"
+                      value={sbData}
+                      onChange={e => setSbData(e.target.value)}
+                      className="h-8 text-sm w-44"
+                    />
+                    <button
+                      onClick={salvarDataRetornoPossivel}
+                      disabled={sbLoading || (!!sbData && !/^\d{4}-\d{2}-\d{2}$/.test(sbData))}
+                      className={cn('px-3 py-1.5 rounded text-xs font-medium transition-colors',
+                        sbLoading ? 'bg-muted text-muted-foreground' : 'bg-amber-500 text-white hover:bg-amber-600')}
+                    >
+                      {sbLoading ? 'Salvando…' : 'Salvar data'}
+                    </button>
+                  </div>
+                  {sbResult && (
+                    <p className={cn('text-[11px] mt-2', sbResult.ok ? 'text-emerald-600' : 'text-red-500')}>
+                      {sbResult.msg}
+                    </p>
+                  )}
+                </div>
+
                 {/* Tem procedimento? */}
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Tem procedimento?</label>
@@ -1090,6 +1273,16 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
                           <div className="flex items-center gap-2 flex-wrap">
                             <Input type="number" step="0.01" min="0" placeholder="Valor pago (R$)"
                               value={procPagoValor} onChange={e => setProcPagoValor(e.target.value)} className="h-8 text-sm w-36" />
+                            <Select value={procMetodo} onValueChange={setProcMetodo}>
+                              <SelectTrigger className="h-8 text-xs w-28"><SelectValue placeholder="Forma" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pix">PIX</SelectItem>
+                                <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                                <SelectItem value="cartao">Cartão</SelectItem>
+                                <SelectItem value="convenio">Convênio</SelectItem>
+                                <SelectItem value="outro">Outro</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <Button onClick={handleProcPago} disabled={!procPagoValor || procPagoLoading} size="sm" className="h-8 gap-1 text-xs">
                               {procPagoLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
                               Marcar pago na clínica
@@ -1128,8 +1321,20 @@ export function LeadModal({ lead: leadProp, onClose, onUpdate, onTransferCard, o
                       <SelectContent>
                         <SelectItem value="sinal">Sinal</SelectItem>
                         <SelectItem value="consulta">Consulta</SelectItem>
+                        <SelectItem value="retorno">Retorno</SelectItem>
                         <SelectItem value="procedimento">Procedimento</SelectItem>
+                        <SelectItem value="acompanhamento">Acompanhamento</SelectItem>
                         <SelectItem value="exame">Exame</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={newPagMetodo} onValueChange={setNewPagMetodo}>
+                      <SelectTrigger className="h-8 text-xs w-28"><SelectValue placeholder="Forma" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pix">PIX</SelectItem>
+                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                        <SelectItem value="cartao">Cartão</SelectItem>
+                        <SelectItem value="convenio">Convênio</SelectItem>
                         <SelectItem value="outro">Outro</SelectItem>
                       </SelectContent>
                     </Select>

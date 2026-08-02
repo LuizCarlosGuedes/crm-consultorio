@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const supabase = createServerClient();
   const body = await req.json();
-  const { lead_id, tipo, descricao, valor } = body;
+  const { lead_id, tipo, metodo, descricao, valor } = body;
 
   if (!lead_id || !valor) {
     return NextResponse.json({ error: 'lead_id e valor são obrigatórios' }, { status: 400 });
@@ -54,8 +54,8 @@ export async function POST(req: NextRequest) {
     if (lead?.telefone) {
       await fetch('https://n8n.drluizguedes.com.br/webhook/lancar-pagamento-manual', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telefone: lead.telefone, valor: Number(valor), tipo: tipo ?? 'outro' }),
+        headers: { 'Content-Type': 'application/json', 'x-webhook-token': process.env.WEBHOOK_SECRET_TOKEN ?? '' },
+        body: JSON.stringify({ telefone: lead.telefone, valor: Number(valor), tipo: tipo ?? 'outro', metodo: metodo ?? 'clinica' }),
       });
     }
   } catch { /* a ponte é best-effort; o lançamento no Supabase já foi salvo */ }

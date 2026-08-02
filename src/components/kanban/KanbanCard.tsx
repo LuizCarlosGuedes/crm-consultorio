@@ -9,6 +9,7 @@ import {
   calcSLAStatus, formatarTempoRelativo, formatarMoeda,
   getOrigemIcon, formatarTag, getEtapa, diasNaEtapa, cn,
   isSLAPausado, isComercial, ehTagInterna,
+  getOrigemLead, ehNotaAutomatica,
 } from '@/lib/utils';
 
 interface KanbanCardProps {
@@ -165,25 +166,44 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onQu
           </div>
         )}
 
-        {/* ── Tags clínicas ────────────────────────────── */}
-        {tagsMostrar.length > 0 && (
-          <div className="flex items-center gap-1 flex-wrap">
-            <Tag className="h-2.5 w-2.5 flex-shrink-0 text-muted-foreground" />
-            {tagsMostrar.map(t => (
-              <span
-                key={t}
-                className="text-[9px] rounded px-1 py-0.5 leading-none border bg-brand-cream dark:bg-brand-slate/20 text-muted-foreground border-brand-gray/40"
-              >
-                {formatarTag(t)}
-              </span>
-            ))}
-            {tagsVisiveis.length > 3 && (
-              <span className="text-[9px] text-muted-foreground">
-                +{tagsVisiveis.length - 3}
-              </span>
-            )}
-          </div>
-        )}
+        {/* ── Origem do lead + Tags clínicas ───────────── */}
+        {(() => {
+          const orig = getOrigemLead(lead);
+          const temTags = tagsMostrar.length > 0;
+          return (
+            <div className="flex items-center gap-1 flex-wrap">
+              {orig ? (
+                <span
+                  title={`De onde veio: ${orig.label}`}
+                  className={cn('inline-flex items-center gap-0.5 text-[9px] font-semibold rounded px-1 py-0.5 leading-none border', orig.cls)}
+                >
+                  {orig.icon} {orig.label}
+                </span>
+              ) : (
+                <span
+                  title="Origem ainda não identificada — a Nathalia vai perguntar"
+                  className="text-[9px] rounded px-1 py-0.5 leading-none border border-dashed border-brand-gray/50 text-muted-foreground/60"
+                >
+                  origem?
+                </span>
+              )}
+              {temTags && <Tag className="h-2.5 w-2.5 flex-shrink-0 text-muted-foreground" />}
+              {tagsMostrar.map(t => (
+                <span
+                  key={t}
+                  className="text-[9px] rounded px-1 py-0.5 leading-none border bg-brand-cream dark:bg-brand-slate/20 text-muted-foreground border-brand-gray/40"
+                >
+                  {formatarTag(t)}
+                </span>
+              ))}
+              {tagsVisiveis.length > 3 && (
+                <span className="text-[9px] text-muted-foreground">
+                  +{tagsVisiveis.length - 3}
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── Pagamento (status) ──────────────────────────── */}
         {(() => {
@@ -208,7 +228,7 @@ export function KanbanCard({ lead, onClick, isOverlay, onPacienteConsultou, onQu
         )}
 
         {/* ── Nota ─────────────────────────────────────── */}
-        {lead.nota && !notaOpen && (
+        {lead.nota && !ehNotaAutomatica(lead.nota) && !notaOpen && (
           <p className="text-[10.5px] italic line-clamp-2 text-foreground/80 bg-brand-cream dark:bg-brand-slate/15 border border-brand-gold/25 rounded px-1.5 py-1">
             💬 {lead.nota}
           </p>

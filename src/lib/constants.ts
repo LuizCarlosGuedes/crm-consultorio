@@ -107,6 +107,12 @@ export const PIPELINE_2: Stage[] = [
     descricao: 'Paciente interessado em retorno. Data sendo definida.',
   },
   {
+    id: 'Stand By', nome: 'Stand By',
+    cor: 'text-amber-500', corBg: 'bg-amber-500/15', corBorda: 'border-amber-500/60', corHex: '#F59E0B',
+    slaMinutos: 525600, slaLabel: '—', pipeline: 2,
+    descricao: 'Paciente indeciso — ainda não escolheu a data do reagendamento. Sem cobrança automática. Coloque a possível data de retorno no card; o Dr é lembrado no briefing diário enquanto o paciente estiver aqui.',
+  },
+  {
     id: 'Retorno Agendado', nome: 'Retorno Agendado',
     cor: 'text-orange-500', corBg: 'bg-orange-500/15', corBorda: 'border-orange-500/60', corHex: '#F97316',
     slaMinutos: 10080, slaLabel: 'Até consulta', pipeline: 2,

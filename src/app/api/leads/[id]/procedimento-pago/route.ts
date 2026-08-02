@@ -14,8 +14,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const res = await fetch(N8N_PROC_PAGO, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ card_id: id, telefone: body.telefone ?? '', valor }),
+      headers: { 'Content-Type': 'application/json', 'x-webhook-token': process.env.WEBHOOK_SECRET_TOKEN ?? '' },
+      body: JSON.stringify({ card_id: id, telefone: body.telefone ?? '', valor, metodo: body.metodo ?? 'clinica' }),
     });
     const text = await res.text();
     const json = text ? JSON.parse(text) : {};

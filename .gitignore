@@ -5,3 +5,4 @@ node_modules/
 # dados de paciente / config de ferramentas - nunca commitar
 backup_cards_teste.json
 .claude/
+tsconfig.tsbuildinfo
